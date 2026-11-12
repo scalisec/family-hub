@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <?!= include('Styles'); ?>
+</head>
+<body data-theme="Rink" data-view="<?= view ?>">
+  <div id="app" aria-live="polite"><p class="loading">Loading Family Hub…</p></div>
+  <div id="dim" aria-hidden="true"></div>
+  <script>window.FH_VIEW = '<?= view ?>';</script>
+  <?!= include('App'); ?>
+</body>
+</html>

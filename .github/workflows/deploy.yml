@@ -1,0 +1,73 @@
+name: Deploy to Google Apps Script
+
+# Every push to main that touches src/ uploads the code and updates the live web app.
+# The web app URL never changes. Needs one repo secret: CLASPRC_JSON (see README).
+on:
+  push:
+    branches: [main]
+    paths: ['src/**', '.github/workflows/deploy.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install clasp
+        run: npm install -g @google/clasp@2.4.2
+
+      - name: Sign in to Google
+        env:
+          CLASPRC_JSON: ${{ secrets.CLASPRC_JSON }}
+        run: |
+          if [ -z "$CLASPRC_JSON" ]; then
+            echo "::error::Add the CLASPRC_JSON repository secret first (see README, step 3)."
+            exit 1
+          fi
+          printf '%s' "$CLASPRC_JSON" > ~/.clasprc.json
+
+      - name: Create the Apps Script project (first run only)
+        if: hashFiles('.clasp.json') == ''
+        run: |
+          cp src/appsscript.json /tmp/appsscript.json
+          clasp create --type webapp --title "Family Hub" --rootDir src
+          cp /tmp/appsscript.json src/appsscript.json
+          git config user.name "family-hub-deploy"
+          git config user.email "actions@users.noreply.github.com"
+          git add .clasp.json
+          git commit -m "Link the Apps Script project"
+          git push
+
+      - name: Upload code
+        run: clasp push --force
+
+      - name: Update the live web app (same URL every time)
+        run: |
+          SHORT="${GITHUB_SHA::7}"
+          ID=$(clasp deployments | grep -E '^- ' | grep -v '@HEAD' | head -n 1 | awk '{print $2}')
+          if [ -z "$ID" ]; then
+            clasp deploy --description "Family Hub $SHORT"
+            ID=$(clasp deployments | grep -E '^- ' | grep -v '@HEAD' | head -n 1 | awk '{print $2}')
+          else
+            clasp deploy --deploymentId "$ID" --description "Family Hub $SHORT"
+          fi
+          URL="https://script.google.com/macros/s/$ID/exec"
+          echo "Web app: $URL"
+          {
+            echo "### Family Hub deployed"
+            echo ""
+            echo "- Phones and tablet: $URL"
+            echo "- Wall: $URL?view=wall"
+          } >> "$GITHUB_STEP_SUMMARY"
