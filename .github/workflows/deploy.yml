@@ -1,7 +1,8 @@
 name: Deploy to Google Apps Script
 
 # Every push to main that touches src/ uploads the code and updates the live web app.
-# The web app URL never changes. Needs one repo secret: CLASPRC_JSON (see README).
+# The web app URL never changes. Needs one repo secret: CLASPRC_JSON (see README),
+# and .clasp.json pointing at the script inside the Family Hub Data sheet.
 on:
   push:
     branches: [main]
@@ -9,7 +10,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: deploy
@@ -38,18 +39,12 @@ jobs:
           fi
           printf '%s' "$CLASPRC_JSON" > ~/.clasprc.json
 
-      - name: Create the Apps Script project (first run only)
-        if: hashFiles('.clasp.json') == ''
+      - name: Check the project link
         run: |
-          cp src/appsscript.json /tmp/appsscript.json
-          # Creates the "Family Hub Data" sheet with the script inside it, so the app can only open that sheet.
-          clasp create --type sheets --title "Family Hub Data" --rootDir src
-          cp /tmp/appsscript.json src/appsscript.json
-          git config user.name "family-hub-deploy"
-          git config user.email "actions@users.noreply.github.com"
-          git add .clasp.json
-          git commit -m "Link the Apps Script project"
-          git push
+          if [ ! -f .clasp.json ]; then
+            echo "::error::Missing .clasp.json. Create the Family Hub Data sheet, open Extensions > Apps Script > Project Settings, and commit its Script ID (see README)."
+            exit 1
+          fi
 
       - name: Upload code
         run: clasp push --force

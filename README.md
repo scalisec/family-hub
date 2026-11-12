@@ -18,7 +18,7 @@ A family wall calendar and organizer that runs on Google Apps Script:
    ```
    Approve in the browser. This writes a file called `.clasprc.json` in your home folder (`~/.clasprc.json` on Mac, `C:\Users\<you>\.clasprc.json` on Windows).
 3. **Add it as a GitHub secret:** in this repo, go to **Settings → Secrets and variables → Actions → New repository secret**. Name it `CLASPRC_JSON` and paste the whole file as the value. Treat this file like a password: it can change your Apps Script projects. Don't commit it.
-4. **Run the first deploy:** go to **Actions → Deploy to Google Apps Script → Run workflow**. The first run creates the **Family Hub Data** sheet with the script inside it, links it to the repo, and prints the web app link in the run summary. Then delete the local key: `del $HOME\.clasprc.json` (Windows) or `rm ~/.clasprc.json` (Mac).
+4. **Create the data sheet and link it:** make a blank Google Sheet named **Family Hub Data**, open **Extensions → Apps Script → Project Settings**, copy the **Script ID**, and put it in `.clasp.json` (`{"scriptId":"<id>","rootDir":"src"}`). Commit and push: the deploy fills in the code and prints the web app link in the run summary. Then delete the local key: `del $HOME\.clasprc.json` (Windows) or `rm ~/.clasprc.json` (Mac).
 5. **Open the link** signed in as the owner, approve permissions (Google shows "unverified app" for personal scripts: **Advanced → Go to Family Hub**), and tap **Set up Family Hub**.
 6. In **Setup**:
    - **Home:** add your address. It's used for drive times and weather.
