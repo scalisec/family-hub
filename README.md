@@ -6,7 +6,8 @@ A family wall calendar and organizer that runs on Google Apps Script:
 
 **Where things live**
 - **Code:** this repo. Every push to `main` deploys it automatically (`.github/workflows/deploy.yml`).
-- **Personal data:** people, calendars, home address, meals and lists all live in a private **Family Hub Data** Google Sheet in the owner's Drive, shared only with the family members added in Setup. None of it is in this repo.
+- **Personal data:** people, calendars, home address, meals and lists all live in a private **Family Hub Data** Google Sheet in the owner's Drive. None of it is in this repo.
+- **Locked down:** the script lives inside that sheet and can only open that one sheet (`spreadsheets.currentonly`), plus read calendars for the sync. Changed code can't reach your other Drive files.
 
 ## One-time setup
 
@@ -17,11 +18,11 @@ A family wall calendar and organizer that runs on Google Apps Script:
    ```
    Approve in the browser. This writes a file called `.clasprc.json` in your home folder (`~/.clasprc.json` on Mac, `C:\Users\<you>\.clasprc.json` on Windows).
 3. **Add it as a GitHub secret:** in this repo, go to **Settings → Secrets and variables → Actions → New repository secret**. Name it `CLASPRC_JSON` and paste the whole file as the value. Treat this file like a password: it can change your Apps Script projects. Don't commit it.
-4. **Run the first deploy:** go to **Actions → Deploy to Google Apps Script → Run workflow**. The first run creates the Apps Script project, links it to the repo, and prints the web app link in the run summary.
+4. **Run the first deploy:** go to **Actions → Deploy to Google Apps Script → Run workflow**. The first run creates the **Family Hub Data** sheet with the script inside it, links it to the repo, and prints the web app link in the run summary. Then delete the local key: `del $HOME\.clasprc.json` (Windows) or `rm ~/.clasprc.json` (Mac).
 5. **Open the link** signed in as the owner, approve permissions (Google shows "unverified app" for personal scripts: **Advanced → Go to Family Hub**), and tap **Set up Family Hub**.
 6. In **Setup**:
    - **Home:** add your address. It's used for drive times and weather.
-   - **People:** add each person with a colour, their Google email and parent/kid. Saving shares the data sheet with them.
+   - **People:** add each person with a colour, their Google email and parent/kid. Then open the data sheet, click **Share**, and add each person as an **Editor** so the app works for them.
    - **Calendars:** tick the calendars to show and pick whose each one is.
 7. **Wall screen:** open the wall link shown at the bottom of Setup and go full screen.
 

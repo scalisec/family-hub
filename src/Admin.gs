@@ -3,9 +3,9 @@
  * Everything personal is saved in the Family Hub Data sheet, never in the code.
  */
 
-/** First run from the web app: creates the data sheet in the visitor's Drive and makes them the owner. */
+/** First run from the web app: builds the tabs in the Family Hub Data sheet and makes the visitor the owner. */
 function bootstrap() {
-  if (PropertiesService.getScriptProperties().getProperty('SHEET_ID')) throw new Error('Family Hub is already set up.');
+  if (PropertiesService.getScriptProperties().getProperty('OWNER_EMAIL')) throw new Error('Family Hub is already set up.');
   return setup();
 }
 
@@ -48,16 +48,7 @@ function savePeople(list) {
     sh.getRange(2, 1, clean.length, SHEETS.People.length).setValues(clean.map(function (p) { return [p.name, p.color, p.email, p.role]; }));
   });
 
-  // Share the data sheet with everyone who has an email, so the app works for them.
-  const owner = PropertiesService.getScriptProperties().getProperty('OWNER_EMAIL');
-  const editors = ss.getEditors().map(function (u) { return u.getEmail().toLowerCase(); });
-  const shared = [];
-  clean.forEach(function (p) {
-    if (p.email && p.email !== owner && editors.indexOf(p.email) < 0) {
-      safe_(function () { ss.addEditor(p.email); shared.push(p.name); }, null);
-    }
-  });
-  return { saved: clean.length, shared: shared };
+  return { saved: clean.length, shared: [] };
 }
 
 function saveFeeds(list) {

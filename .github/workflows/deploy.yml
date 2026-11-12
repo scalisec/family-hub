@@ -42,7 +42,8 @@ jobs:
         if: hashFiles('.clasp.json') == ''
         run: |
           cp src/appsscript.json /tmp/appsscript.json
-          clasp create --type webapp --title "Family Hub" --rootDir src
+          # Creates the "Family Hub Data" sheet with the script inside it, so the app can only open that sheet.
+          clasp create --type sheets --title "Family Hub Data" --rootDir src
           cp /tmp/appsscript.json src/appsscript.json
           git config user.name "family-hub-deploy"
           git config user.email "actions@users.noreply.github.com"

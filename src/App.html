@@ -544,7 +544,7 @@
     function drawPeople() { list.replaceChildren(); rows.forEach(function (p, i) { add(list, personRow(p, i)); }); }
     drawPeople();
     var people = h('div', { class: 'card' }, h('h2', null, 'People'),
-      h('p', { class: 'muted' }, 'Adding someone’s Google email shares the data sheet with them so they can use the app.'),
+      h('p', { class: 'muted' }, 'To let someone use the app, add their Google email here, then share the Family Hub Data sheet with them as an Editor (Open data sheet → Share). The app can’t share it for you: it’s locked to this one sheet.'),
       list,
       h('div', { class: 'form', style: 'margin-top:10px' },
         h('button', { type: 'button', class: 'btn ghost', onclick: function () { rows.push({ name: '', color: '#7C3AED', email: '', role: 'kid' }); drawPeople(); } }, '+ Add person'),
@@ -589,7 +589,7 @@
     var app = document.getElementById('app');
     if (/NO_ACCESS/.test(errorMsg)) {
       app.replaceChildren(h('div', { class: 'remote' }, h('div', { class: 'card' }, h('h1', null, 'Family Hub'),
-        h('p', null, 'You don’t have access yet. Ask whoever set up Family Hub to add your email on their Setup screen, then reload this page.'))));
+        h('p', null, 'You don’t have access yet. Ask whoever set up Family Hub to share the Family Hub Data sheet with you, then reload this page.'))));
       return true;
     }
     if (!/NOT_SET_UP/.test(errorMsg)) return false;
@@ -603,7 +603,7 @@
         .catch(function (e) { btn.disabled = false; btn.textContent = 'Set up Family Hub'; errorMsg = (e && e.message) || 'Setup failed.'; render(); });
     } }, 'Set up Family Hub');
     app.replaceChildren(h('div', { class: 'remote' }, h('div', { class: 'card' }, h('h1', null, 'Welcome to Family Hub'),
-      h('p', null, 'This creates a private “Family Hub Data” sheet in your Google Drive and makes you the owner. Next you’ll pick your calendars and add your family.'),
+      h('p', null, 'This sets up the private “Family Hub Data” sheet in your Google Drive and makes you the owner. Next you’ll pick your calendars and add your family.'),
       btn)));
     return true;
   }

@@ -1,6 +1,7 @@
 /**
  * Family Hub — server side (Google Apps Script).
- * Data lives in one Google Sheet ("Family Hub Data") in the owner's Drive.
+ * The script is bound to the "Family Hub Data" sheet and can only open that one sheet
+ * (spreadsheets.currentonly), plus read calendars for the sync.
  * The web app runs as the person who opens it, so only people the Sheet
  * is shared with can read or change anything.
  */
@@ -48,14 +49,7 @@ function setup() {
   const owner = props.getProperty('OWNER_EMAIL');
   if (owner && owner !== me_().toLowerCase()) throw new Error('Family Hub is already set up by its owner.');
   if (!owner) props.setProperty('OWNER_EMAIL', me_().toLowerCase());
-  let ss;
-  const existing = props.getProperty('SHEET_ID');
-  if (existing) {
-    ss = SpreadsheetApp.openById(existing);
-  } else {
-    ss = SpreadsheetApp.create('Family Hub Data');
-    props.setProperty('SHEET_ID', ss.getId());
-  }
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
   Object.keys(SHEETS).forEach(function (name) {
     let sh = ss.getSheetByName(name);
     if (!sh) sh = ss.insertSheet(name);
@@ -110,13 +104,11 @@ function seedIfEmpty_(ss, name, rows) {
 /* ---------- Sheet helpers ---------- */
 
 function ss_() {
-  const id = PropertiesService.getScriptProperties().getProperty('SHEET_ID');
-  if (!id) throw new Error('NOT_SET_UP');
-  try {
-    return SpreadsheetApp.openById(id);
-  } catch (e) {
-    throw new Error('NO_ACCESS');
-  }
+  if (!PropertiesService.getScriptProperties().getProperty('OWNER_EMAIL')) throw new Error('NOT_SET_UP');
+  let ss = null;
+  try { ss = SpreadsheetApp.getActiveSpreadsheet(); } catch (e) { ss = null; }
+  if (!ss) throw new Error('NO_ACCESS');
+  return ss;
 }
 
 function isOwner_() {
