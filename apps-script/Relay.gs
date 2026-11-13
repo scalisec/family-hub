@@ -17,7 +17,7 @@
 
 const TZ = 'America/Toronto';
 const CLIENT_ID = '1061398617166-8t015jus9o3vb95n6r46t01v46jnetkk.apps.googleusercontent.com';
-const WINDOW_DAYS = 14;
+const WINDOW_DAYS = 63;
 const CHUNK = 45000;
 
 // Google Calendar's event colours (the ones picked on a single event), by colour ID.
@@ -145,6 +145,7 @@ function cleanSnapshot_(s) {
   out.theme = String(s.theme || 'Rink').slice(0, 30);
   out.themeBase = String(s.themeBase || 'Rink').slice(0, 30);
   out.teamThemes = s.teamThemes && typeof s.teamThemes === 'object' ? s.teamThemes : null;
+  out.calendar = s.calendar && typeof s.calendar === 'object' ? s.calendar : {};
   out.teamLogos = {};
   if (s.teamLogos && typeof s.teamLogos === 'object') {
     Object.keys(s.teamLogos).slice(0, 6).forEach(function (k) {
@@ -172,8 +173,12 @@ function syncCalendars() {
   const people = {};
   (snap.people || []).forEach(function (p) { people[p.id] = p; });
   const now = new Date();
-  const from = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-  const to = from + WINDOW_DAYS * 86400000;
+  // From the start of this month's calendar page (or last week, if earlier) to 9 weeks ahead,
+  // so the month view and the next few weeks are always filled in.
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const first = new Date(now.getFullYear(), now.getMonth(), 1);
+  const from = Math.min(today - 7 * 86400000, first.getTime() - first.getDay() * 86400000);
+  const to = today + WINDOW_DAYS * 86400000;
   const out = [];
   const errors = [];
 

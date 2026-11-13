@@ -394,3 +394,80 @@ body.wallpage { font-size: 1.04vw; }
 .install-row { display: flex; align-items: center; gap: 12px; }
 .install-icon { width: 44px; height: 44px; border-radius: 11px; flex-shrink: 0; }
 .install-how { margin: 10px 0 0; }
+
+/* ---------- Calendar views ---------- */
+.calnav { display: flex; align-items: center; gap: 6px; }
+.calnav-title { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 1.1rem; min-width: 9em; text-align: center; }
+.cal-card { padding: 10px; }
+.radio { width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--line); flex-shrink: 0; transition: border-color .15s, border-width .15s; }
+.radio.on { border: 6px solid var(--accent); }
+.ev-detail { display: flex; gap: 12px; }
+.plain-row { padding: 0; display: block; }
+.plain-row .ev { pointer-events: none; }
+
+/* time grid */
+.calgrid { display: flex; flex-direction: column; font-size: .78rem; }
+.cg-head, .cg-allday { display: grid; grid-template-columns: 2.6em repeat(7, 1fr); }
+.cg-day { display: flex; flex-direction: column; align-items: center; background: none; border: 0; padding: 2px 0 6px; color: var(--muted); }
+.cg-dow { font-size: .8em; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+.cg-num { font-family: 'Space Grotesk', sans-serif; font-size: 1.35em; font-weight: 700; color: var(--ink); width: 1.8em; height: 1.8em; display: grid; place-items: center; border-radius: 50%; }
+.cg-day.today .cg-num { background: var(--accent); color: var(--accent-ink); }
+.cg-allday { border-top: 1px solid var(--line); padding: 3px 0; }
+.cg-gut { color: var(--muted); font-size: .8em; align-self: center; }
+.cg-adcell { display: flex; flex-direction: column; gap: 2px; padding: 0 1px; min-width: 0; }
+.cg-ad { border: 0; color: #fff; border-radius: 5px; padding: 2px 4px; font-weight: 600; text-align: left; font-size: .92em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cg-body { display: grid; grid-template-columns: 2.6em 1fr; height: 62vh; min-height: 420px; border-top: 1px solid var(--line); }
+.cg-gutter { position: relative; }
+.cg-gutter span { position: absolute; right: 4px; transform: translateY(-50%); color: var(--muted); font-size: .78em; white-space: nowrap; }
+.cg-cols { position: relative; display: grid; grid-template-columns: repeat(7, 1fr); }
+.cg-line { position: absolute; left: 0; right: 0; border-top: 1px solid var(--line); pointer-events: none; }
+.cg-col { position: relative; border-left: 1px solid var(--line); }
+.cg-col.today { background: color-mix(in srgb, var(--accent-soft) 45%, transparent); }
+.cg-ev { position: absolute; border: 0; border-radius: 5px; padding: 2px 4px; color: #fff; text-align: left; overflow: hidden; line-height: 1.15; display: flex; flex-direction: column; box-shadow: 0 0 0 1px var(--card); }
+.cg-ev b { font-size: .95em; overflow: hidden; text-overflow: ellipsis; }
+.cg-t { font-size: .85em; opacity: .9; white-space: nowrap; overflow: hidden; }
+.cg-ev.short { flex-direction: row; gap: 4px; align-items: center; }
+.cg-ev.short .cg-t { display: none; }
+.cg-ev .ptag { background: rgba(255,255,255,.9); font-size: .7em; }
+.cg-now { position: absolute; left: -3px; right: 0; height: 2px; background: #DC2626; pointer-events: none; }
+.cg-now::before { content: ''; position: absolute; left: -3px; top: -3px; width: 8px; height: 8px; border-radius: 50%; background: #DC2626; }
+
+/* 7 columns */
+.calcols { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; font-size: .78rem; min-height: 50vh; }
+.cc-day { background: var(--chip); border-radius: 10px; padding: 4px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.cc-day.today { background: var(--accent-soft); box-shadow: inset 0 0 0 2px var(--accent); }
+.cc-head { display: flex; justify-content: space-between; background: none; border: 0; font-weight: 700; padding: 2px 3px; }
+.cc-ev { background: var(--card); border: 0; border-left: 3px solid; border-radius: 6px; padding: 3px 4px; text-align: left; display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.cc-ev b { overflow: hidden; text-overflow: ellipsis; overflow-wrap: anywhere; }
+.cc-t { color: var(--muted); font-size: .88em; display: flex; flex-wrap: wrap; gap: 2px; align-items: center; }
+.cc-dinner { margin-top: auto; font-size: .85em; color: var(--muted); padding: 2px 3px; }
+
+/* month */
+.calmonth { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 3px; font-size: .72rem; }
+.cm-dow { text-align: center; font-weight: 700; color: var(--muted); padding: 2px 0 4px; font-size: .9em; }
+.cm-day { background: var(--chip); border: 0; border-radius: 7px; padding: 3px 4px; min-height: 64px; display: flex; flex-direction: column; align-items: stretch; gap: 1px; text-align: left; overflow: hidden; min-width: 0; }
+.cm-day.off { opacity: .45; }
+.cm-day.today { background: var(--accent-soft); box-shadow: inset 0 0 0 2px var(--accent); }
+.cm-num { font-weight: 700; }
+.cm-ev { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cm-ev i { display: inline-block; width: .55em; height: .55em; border-radius: 50%; margin-right: .3em; vertical-align: middle; }
+.cm-more { color: var(--muted); font-weight: 600; }
+@media (min-width: 700px) { .calgrid, .calcols { font-size: .9rem; } .calmonth { font-size: .82rem; } .cm-day { min-height: 92px; } }
+
+/* calendars on the wall */
+.w-cols.wide { grid-template-columns: 23fr 50fr 24fr; }
+.wall .cal-tile { display: flex; flex-direction: column; }
+.wall .cal-tile > :last-child { flex: 1; min-height: 0; }
+.wall .calgrid { font-size: .82em; height: 100%; }
+.wall .cg-body { height: auto; min-height: 0; flex: 1; }
+.wall .calcols { font-size: .85em; min-height: 0; height: 100%; }
+.wall .calmonth { font-size: .8em; height: 100%; }
+.wall .cm-day { min-height: 0; }
+.wall .cg-day, .wall .cc-head, .wall .cm-day, .wall .cg-ev, .wall .cc-ev, .wall .cg-ad { cursor: default; }
+@media (max-width: 699px) {
+  .calcols { font-size: .66rem; gap: 2px; }
+  .cc-ev { padding: 2px 3px; }
+  .cc-ev b { overflow-wrap: normal; word-break: normal; hyphens: auto; }
+  .cc-t .ptag { display: none; }
+  .cc-dinner { display: none; }
+}

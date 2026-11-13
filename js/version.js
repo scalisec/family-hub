@@ -1,8 +1,13 @@
 // The app's version and release history (newest first). Keep VERSION, package.json and
 // version.json in step: the tests check they match.
-export const VERSION = '3.1.2';
+export const VERSION = '3.2.0';
 
 export const RELEASES = [
+  { version: '3.2.0', date: '2026-11-13', notes: [
+    'Real calendar views: Week (time grid or 7 columns) and Month, with arrows to look ahead or back. The old list is still there.',
+    'Tap an event for details and a map link, or a day for its events and dinner.',
+    'The wall can show the week grid, the month, or the list (More > Calendar view). Calendars now cover about 9 weeks ahead.',
+  ] },
   { version: '3.1.2', date: '2026-11-12', notes: ['The Update button now always gets the newest version.', 'Install button moved to More > About and updates.'] },
   { version: '3.1.1', date: '2026-11-12', notes: ['Install button in More: puts Family Hub on your home screen like a regular app.'] },
   { version: '3.1.0', date: '2026-11-12', notes: [

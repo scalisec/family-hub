@@ -3,6 +3,7 @@
 import { h, icon } from './ui.js';
 import * as dates from './dates.js';
 import { wallFeed, wallPhoto } from './relay.js';
+import { calSettings, weekStartOf, weekGrid, weekColumns, monthGrid, monthTitle, weekTitle } from './calview.js';
 import { resolveTheme, gameDayTheme, SEASONAL_THEMES, TEAM_THEMES } from './themes.js';
 import { getWeather, cachedWeather, wxIcon } from './weather.js';
 import { VERSION, latestVersion, compareVersions } from './version.js';
@@ -69,6 +70,21 @@ function week() {
         list.length > 6 ? h('span', { class: 'muted small' }, `+${list.length - 6} more`) : null,
         dinner ? h('span', { class: 'dinner muted small' }, icon('meals'), dinner) : null));
   });
+}
+
+function calendarTile() {
+  const o = calSettings(snap().calendar);
+  const evs = (feed && feed.feed && feed.feed.events) || [];
+  const dinners = Object.fromEntries((snap().meals || []).filter((m) => m.slot === 'dinner').map((m) => [m.date, m.text]));
+  const tagFn = tag;
+  if (o.wallView === 'list') return tile('week', 'This week', h('div', { class: 'week' }, week()), 'grow');
+  if (o.wallView === 'month') {
+    const now = new Date();
+    return tile('week', monthTitle(now.getFullYear(), now.getMonth()).replace(/ \d{4}$/, ''), monthGrid(evs, now.getFullYear(), now.getMonth(), { weekStart: o.weekStart, max: 3 }), 'grow cal-tile');
+  }
+  const start = weekStartOf(new Date(), o.weekStart);
+  const args = { tag: tagFn, dinner: (d) => dinners[dates.dateKey(d)] || '' };
+  return tile('week', `This week \u00b7 ${weekTitle(start)}`, o.weekStyle === 'columns' ? weekColumns(evs, start, args) : weekGrid(evs, start, args), 'grow cal-tile');
 }
 
 function mealsToday() {
@@ -235,9 +251,9 @@ function render() {
       h('div', { class: 'w-left' }, (s.teamLogos || {})[theme] ? h('img', { class: 'w-logo', src: s.teamLogos[theme], alt: '' }) : null, h('div', null, h('div', { class: 'w-date' }, now.toLocaleDateString('en-CA', { weekday: 'long', month: 'long', day: 'numeric' })),
         h('div', { class: 'w-sub' }, h('span', { class: 'w-clock' }, dates.time(now.getTime())), problem ? h('span', { class: 'w-warn' }, ` · ${problem}`) : null))),
       weather()),
-    h('div', { class: 'w-cols' },
+    h('div', { class: `w-cols${calSettings(s.calendar).wallView === 'list' ? '' : ' wide'}` },
       h('div', { class: 'col' }, tile('nextUp', 'Next up', h('div', null, nextUp()), 'grow'), tile('meals', 'Meals today', mealsToday())),
-      h('div', { class: 'col' }, tile('week', 'This week', h('div', { class: 'week' }, week()), 'grow')),
+      h('div', { class: 'col' }, calendarTile()),
       h('div', { class: 'col' }, tile('todos', 'To-dos', h('div', null, todos()), 'grow'), tile('groceries', 'Groceries', groceries()),
         photoSettings().tile !== false && photoIds().length ? h('section', { class: 'card photo-card' }, photoEl) : null)),
     daily()));

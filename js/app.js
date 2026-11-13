@@ -12,11 +12,13 @@ import { prepare, isImage } from './photos.js';
 import { platform, canPrompt, promptInstall, onInstallChange } from './install.js';
 import * as sync from './sync.js';
 import { VERSION, RELEASES, latestVersion, compareVersions, releaseDate } from './version.js';
+import { calSettings, weekStartOf, weekGrid, weekColumns, monthGrid, monthTitle, weekTitle } from './calview.js';
 import { BASE_THEMES, SEASONAL_THEMES, TEAM_THEMES, SWATCHES, AUTO, seasonFor, seasonCalendar, gameDayTheme } from './themes.js';
 
 const { state } = sync;
 const ui = {
   tab: sessionStorage.getItem('fh.tab') || 'today',
+  calView: sessionStorage.getItem('fh.calView') || 'week',
   meals: 'plan', mealsWeek: 0, lists: 'groceries', more: null, weekPart: 0,
   todoWho: 'all', recipeSearch: '', weather: null, connecting: false, stale: false, scroll: {},
 };
@@ -400,30 +402,85 @@ function dailyCard() {
 
 /* ---------- Week ---------- */
 
+function calOpts() { return calSettings(store.setting(D(), 'calendar', {})); }
+
 function weekScreen() {
-  const start = dates.addDays(dates.startOfDay(), ui.weekPart * 7);
-  const days = Array.from({ length: 7 }, (_, i) => dates.addDays(start, i));
+  const view = ui.calView || 'week';
+  const opts = calOpts();
   const ppl = peopleList();
   const filter = ui.weekWho || 'all';
   const show = (e) => filter === 'all' || e.person === filter || (filter === 'family' && !e.person);
-  return h('div', { class: 'screen' },
-    h('div', { class: 'toolbar' },
-      segmented([[0, 'Next 7 days'], [1, 'Week after']], ui.weekPart, (v) => { ui.weekPart = v; render(); })),
-    h('div', { class: 'chips' }, [['all', 'Everyone'], ...ppl.map((p) => [p.id, p.name])].map(([id, name]) => h('button', {
-      class: `chip${filter === id ? ' on' : ''}`, onclick: () => { ui.weekWho = id; render(); },
-    }, id !== 'all' ? h('span', { class: 'dot', style: { background: (person(id) || {}).color } }) : null, name))),
-    !state.feed ? card(null, empty(isConnected() ? 'Reading your calendars...' : 'Connect Google to see your calendars.')) : null,
-    days.map((day) => {
+  const evs = events().filter(show);
+  const today = dates.startOfDay();
+  const dinner = (d) => mealText(store.get(D(), 'meals', store.mealId(dates.dateKey(d), 'dinner')));
+  let title = '';
+  let body;
+  if (view === 'month') {
+    const m = new Date(today.getFullYear(), today.getMonth() + (ui.monthOffset || 0), 1);
+    title = monthTitle(m.getFullYear(), m.getMonth());
+    body = h('section', { class: 'card cal-card' }, monthGrid(evs, m.getFullYear(), m.getMonth(), { weekStart: opts.weekStart, onDay: daySheet, max: 3 }));
+  } else if (view === 'week') {
+    const start = dates.addDays(weekStartOf(today, opts.weekStart), 7 * (ui.weekOffset || 0));
+    title = weekTitle(start);
+    const args = { tag, onEvent: eventSheet, onDay: daySheet, dinner };
+    body = h('section', { class: 'card cal-card' }, opts.weekStyle === 'columns' ? weekColumns(evs, start, args) : weekGrid(evs, start, args));
+  } else {
+    const start = dates.addDays(today, 7 * (ui.weekPart || 0));
+    title = ui.weekPart ? 'The week after' : 'Next 7 days';
+    body = Array.from({ length: 7 }, (_, i) => dates.addDays(start, i)).map((day) => {
       const list = eventsOn(day).filter(show);
-      const today = dates.dateKey(day) === dates.dateKey(new Date());
-      const dinner = mealText(store.get(D(), 'meals', store.mealId(dates.dateKey(day), 'dinner')));
-      return h('section', { class: `card day${today ? ' is-today' : ''}` },
+      const isT = dates.dateKey(day) === dates.dateKey(new Date());
+      const din = dinner(day);
+      return h('section', { class: `card day${isT ? ' is-today' : ''}` },
         h('div', { class: 'day-head' },
           h('div', { class: 'day-num' }, String(day.getDate())),
           h('div', null, h('div', { class: 'strong' }, dates.dayLabel(day)), h('div', { class: 'muted small' }, day.toLocaleDateString('en-CA', { weekday: 'short', month: 'short', day: 'numeric' }))),
-          dinner ? h('div', { class: 'day-dinner small muted' }, icon('meals'), dinner) : null),
+          din ? h('div', { class: 'day-dinner small muted' }, icon('meals'), din) : null),
         list.length ? h('div', { class: 'list' }, list.map(eventRow)) : h('div', { class: 'muted small pad' }, 'Free'));
-    }));
+    });
+  }
+  const shift = (n) => {
+    if (view === 'month') ui.monthOffset = (ui.monthOffset || 0) + n;
+    else if (view === 'week') ui.weekOffset = (ui.weekOffset || 0) + n;
+    else ui.weekPart = Math.max(0, Math.min(1, (ui.weekPart || 0) + n));
+    render();
+  };
+  const atNow = view === 'month' ? !ui.monthOffset : view === 'week' ? !ui.weekOffset : !ui.weekPart;
+  return h('div', { class: 'screen' },
+    h('div', { class: 'toolbar' },
+      segmented([['week', 'Week'], ['month', 'Month'], ['list', 'List']], view, (v) => { ui.calView = v; sessionStorage.setItem('fh.calView', v); render(); })),
+    h('div', { class: 'calnav' },
+      h('button', { class: 'icon-btn', 'aria-label': 'Earlier', onclick: () => shift(-1) }, icon('back')),
+      h('div', { class: 'calnav-title' }, title),
+      h('button', { class: 'icon-btn', 'aria-label': 'Later', onclick: () => shift(1) }, icon('chevron')),
+      !atNow ? h('button', { class: 'btn ghost small', onclick: () => { ui.monthOffset = 0; ui.weekOffset = 0; ui.weekPart = 0; render(); } }, 'Today') : null),
+    h('div', { class: 'chips' }, [['all', 'Everyone'], ...ppl.map((p) => [p.id, p.name.split(' ')[0]])].map(([id, name]) => h('button', {
+      class: `chip${filter === id ? ' on' : ''}`, onclick: () => { ui.weekWho = id; render(); },
+    }, id !== 'all' ? h('span', { class: 'dot', style: { background: (person(id) || {}).color } }) : null, name))),
+    !state.feed ? card(null, empty(isConnected() ? 'Reading your calendars...' : 'Connect Google to see your calendars.')) : null,
+    body);
+}
+
+function eventSheet(e) {
+  const p = person(e.person);
+  const when = e.allDay ? `${dates.dayLabel(new Date(e.start))}, all day`
+    : `${dates.dayLabel(new Date(e.start))}, ${dates.time(e.start)} to ${dates.time(e.end)}`;
+  sheet(e.title, h('div', { class: 'stack' },
+    h('div', { class: 'ev-detail' }, h('span', { class: 'bar', style: { background: e.color || 'var(--accent)' } }),
+      h('div', null, h('div', { class: 'strong' }, when), h('div', { class: 'muted small' }, new Date(e.start).toLocaleDateString('en-CA', { weekday: 'long', month: 'long', day: 'numeric' })))),
+    h('div', { class: 'checkline' }, tag(e.person), h('span', null, p ? p.name : 'Family'), e.feed ? h('span', { class: 'muted small' }, ` · ${e.feed}`) : null),
+    e.location ? h('a', { class: 'btn ghost', href: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(e.location)}`, target: '_blank', rel: 'noopener' }, icon('pin'), e.location) : null,
+    h('p', { class: 'muted small' }, 'To change this event, edit it in Google Calendar. It updates here within 15 minutes.')));
+}
+
+function daySheet(d) {
+  const list = eventsOn(d);
+  const key = dates.dateKey(d);
+  const din = mealText(store.get(D(), 'meals', store.mealId(key, 'dinner')));
+  sheet(d.toLocaleDateString('en-CA', { weekday: 'long', month: 'long', day: 'numeric' }), h('div', { class: 'stack' },
+    list.length ? h('div', { class: 'list' }, list.map((e) => h('button', { class: 'row plain-row', type: 'button', onclick: () => eventSheet(e) }, eventRow(e)))) : h('p', { class: 'muted' }, 'Nothing on the calendar.'),
+    row({ onclick: () => mealPicker(key, 'dinner', 'Dinner') }, h('div', { class: 'row-label' }, icon('meals'), h('span', { class: 'muted small' }, 'Dinner')),
+      h('div', { class: `row-value${din ? '' : ' placeholder'}` }, din || 'Plan it'), icon('chevron', 'tail'))));
 }
 
 /* ---------- Meals ---------- */
@@ -675,6 +732,7 @@ const MORE = [
   ['photos', 'Photos and slideshow', 'image'],
   ['people', 'People', 'people'],
   ['calendars', 'Calendars', 'calendar'],
+  ['calview', 'Calendar view', 'week'],
   ['rules', 'Arrival times', 'clock'],
   ['home', 'Home and weather', 'home'],
   ['account', 'Google account', 'google'],
@@ -727,6 +785,7 @@ function morePage(page) {
     case 'photos': return photosPage();
     case 'people': return peoplePage();
     case 'calendars': return calendarsPage();
+    case 'calview': return calViewPage();
     case 'rules': return rulesPage();
     case 'home': return homePage();
     case 'account': return accountPage();
@@ -1046,6 +1105,17 @@ function calendarsPage() {
     }).catch((err) => listEl.replaceChildren(h('div', { class: 'warn-text pad' }, err.message)));
   }
   return box;
+}
+
+function calViewPage() {
+  const o = calOpts();
+  const setC = (patch) => change((d) => store.setSetting(d, 'calendar', { ...calSettings(store.setting(d, 'calendar', {})), ...patch }));
+  const choice = (label, options, value, key) => card(label, h('div', { class: 'list' }, options.map(([v, text, note]) => row({ class: `row${value === v ? ' on' : ''}`, onclick: () => { setC({ [key]: v }); haptic(); } },
+    h('span', { class: `radio${value === v ? ' on' : ''}` }), h('div', { class: 'row-value' }, text, note ? h('div', { class: 'muted small' }, note) : null)))));
+  return h('div', { class: 'stack' },
+    choice('Week style', [['grid', 'Time grid', 'Hours down the side, events sized by how long they run'], ['columns', '7 columns', 'One column per day, events listed in order']], o.weekStyle, 'weekStyle'),
+    choice('The wall shows', [['week', 'This week'], ['month', 'This month'], ['list', 'Next 7 days as a list', 'The original compact list']], o.wallView, 'wallView'),
+    choice('Weeks start on', [[0, 'Sunday'], [1, 'Monday']], o.weekStart, 'weekStart'));
 }
 
 function rulesPage() {
