@@ -109,6 +109,16 @@ export const LONG = 6 * HOUR;
 export const isLong = (e) => !e.allDay && e.end - e.start >= LONG;
 const inStrip = (e) => e.allDay || isLong(e);
 
+// Dark text on light event colours (yellow, light blue, grey), white on the rest.
+export function inkFor(color) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(String(color || '').trim());
+  if (!m) return '#FFFFFF';
+  const n = parseInt(m[1], 16);
+  const lin = (c) => { const x = c / 255; return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4; };
+  const L = 0.2126 * lin((n >> 16) & 255) + 0.7152 * lin((n >> 8) & 255) + 0.0722 * lin(n & 255);
+  return L > 0.4 ? '#0F172A' : '#FFFFFF';
+}
+
 const isToday = (d) => dates.dateKey(d) === dates.dateKey(new Date());
 
 /* ---------- Week: time grid ---------- */
@@ -125,7 +135,7 @@ export function weekGrid(events, start, { tag, onEvent, onDay } = {}) {
   const head = h('div', { class: 'cg-head' }, h('div'), days.map((d) => h('button', { class: `cg-day${isToday(d) ? ' today' : ''}`, type: 'button', onclick: onDay ? () => onDay(d) : null },
     h('span', { class: 'cg-dow' }, WEEKDAY_SHORT[d.getDay()]), h('span', { class: 'cg-num' }, String(d.getDate())))));
   const allDay = hasAllDay ? h('div', { class: 'cg-allday' }, h('div', { class: 'cg-gut' }, 'all day'),
-    all.map((list) => h('div', { class: 'cg-adcell' }, list.filter(inStrip).map((e) => h('button', { class: 'cg-ad', type: 'button', style: { background: e.color || 'var(--accent)' }, onclick: onEvent ? () => onEvent(e) : null },
+    all.map((list) => h('div', { class: 'cg-adcell' }, list.filter(inStrip).map((e) => h('button', { class: 'cg-ad', type: 'button', style: { background: e.color || 'var(--accent)', color: inkFor(e.color) }, onclick: onEvent ? () => onEvent(e) : null },
       isLong(e) ? h('span', { class: 'cg-adt' }, `${dates.time(e.start)} `) : null, e.title))))) : null;
 
   const hours = [];
@@ -148,8 +158,8 @@ export function weekGrid(events, start, { tag, onEvent, onDay } = {}) {
         const y0 = scale.at(top);
         const y1 = scale.at(top + len);
         return h('button', { class: `cg-ev${(y1 - y0) < 0.045 ? ' short' : ''}`, type: 'button', onclick: onEvent ? () => onEvent(o) : null, style: {
-          top: `${y0 * 100}%`, height: `${Math.max(0.02, y1 - y0) * 100}%`, left: `calc(${(lane / n) * 100}% + 2px)`, width: `calc(${100 / n}% - 4px)`, background: o.color || 'var(--accent)',
-        } }, h('b', null, o.title), h('span', { class: 'cg-t' }, dates.time(o.start), tag ? [' ', tag(o.person)] : null));
+          top: `${y0 * 100}%`, height: `${Math.max(0.02, y1 - y0) * 100}%`, left: `calc(${(lane / n) * 100}% + 2px)`, width: `calc(${100 / n}% - 4px)`, background: o.color || 'var(--accent)', color: inkFor(o.color),
+        } }, h('span', { class: 'cg-t' }, dates.time(o.start), tag ? [' ', tag(o.person)] : null), h('b', null, o.title));
       }),
       isToday(d) && now > d0 + h0 * HOUR && now < d0 + h1 * HOUR ? h('div', { class: 'cg-now', style: { top: pct((now - d0) / HOUR) } }) : null);
     return col;

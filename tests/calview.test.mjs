@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { lanes, hourRange, hourScale, isLong, monthDays, weekStartOf, calSettings, eventsOn } from '../js/calview.js';
+import { lanes, hourRange, hourScale, isLong, inkFor, monthDays, weekStartOf, calSettings, eventsOn } from '../js/calview.js';
 
 const at = (d, h, m = 0) => new Date(2026, 10, d, h, m).getTime();
 
@@ -64,4 +64,12 @@ test('day-long events go in the all-day strip instead of stretching the hours', 
   assert.ok(isLong({ start: at(8, 8), end: at(8, 14) }));
   assert.ok(!isLong({ start: at(8, 9), end: at(8, 11) }));
   assert.ok(!isLong({ allDay: true, start: at(8, 0), end: at(9, 0) }));
+});
+
+test('event text stays readable on light colours', () => {
+  assert.equal(inkFor('#FBD75B'), '#0F172A'); // Google yellow
+  assert.equal(inkFor('#7DD3E0'), '#0F172A'); // light blue
+  assert.equal(inkFor('#F4511E'), '#FFFFFF'); // tangerine
+  assert.equal(inkFor('#039BE5'), '#FFFFFF');
+  assert.equal(inkFor(''), '#FFFFFF');
 });

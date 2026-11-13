@@ -542,3 +542,15 @@ main#main.cal-full > .cal-screen { flex: 1; min-height: 0; gap: 4px; }
   .cal-bar { margin-bottom: 0; }
   .cal-bar .icon-btn { width: 34px; height: 34px; }
 }
+/* Event tiles: time on top (never cut off), title fills the rest */
+.cg-ev { justify-content: flex-start; }
+.cg-ev .cg-t { flex-shrink: 0; opacity: .85; }
+.cg-ev b { min-height: 0; overflow: hidden; }
+.cg-ev.short { flex-direction: row-reverse; justify-content: flex-end; }
+.cg-ev.short .cg-t { display: none; }
+.cg-ev .ptag { background: rgba(255,255,255,.92); }
+/* One-line reconnect bar above the full-screen week */
+.banner.slim { margin: 0 6px 4px; padding: 6px 10px; border-radius: 12px; }
+.banner.slim .muted { display: none; }
+.banner.slim strong { font-size: .92rem; }
+.banner.slim .btn { min-height: 32px; }

@@ -127,6 +127,7 @@ function render({ animate = false } = {}) {
   const full = ui.tab === 'week' && (ui.calView || 'week') === 'week';
   const main = h('main', { id: 'main', class: `${animate ? 'enter' : ''}${full ? ' cal-full' : ''}` }, screen());
   const banner = !isConnected() && !ui.connecting ? connectBanner() : null;
+  if (banner && ui.tab === 'week' && (ui.calView || 'week') === 'week') banner.classList.add('slim');
   const deco = hasDeco() ? h('div', { class: 'deco-band', 'aria-hidden': 'true' }) : null;
   root.replaceChildren(...[full ? null : header(), full ? null : deco, banner, main, full ? null : fab(), tabbar()].filter(Boolean));
   const y = ui.scroll[ui.tab] || 0;
