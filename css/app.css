@@ -505,3 +505,27 @@ main#main.cal-full > .cal-screen { flex: 1; min-height: 0; gap: 4px; }
 .wall-full .calgrid { font-size: .95em; }
 .wall-full .cg-ev b { font-size: 1em; }
 .wall-full .calcols { font-size: 1em; }
+
+/* Bigger event tiles in week view */
+.cg-ev { padding: 3px 5px; border-radius: 6px; }
+.cg-ev b { white-space: normal; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
+.cal-screen .calgrid { font-size: .86rem; }
+.cal-screen .cg-ev b { font-size: 1em; line-height: 1.15; }
+.cal-screen .cg-t { font-size: .82em; }
+.wall-full .calgrid { font-size: 1.25em; }
+.wall-full .cg-ev { padding: .35em .5em; border-radius: .5em; }
+.wall-full .cg-ev b { font-size: 1.05em; -webkit-line-clamp: 2; }
+.wall-full .cg-t { font-size: .85em; }
+.wall-full .cg-ev .ptag { font-size: .75em; }
+.wall-full .cg-num { font-size: 1.3em; }
+.wall-full .cg-ad { font-size: .9em; padding: .2em .5em; }
+.wall-full .calcols { font-size: 1.2em; }
+.cg-line.faint { border-top-style: dashed; opacity: .5; }
+@media (max-width: 699px) {
+  .cal-screen .calgrid { font-size: .74rem; }
+  .cal-screen .cg-ev { padding: 2px 3px; }
+  .cal-screen .cg-ev b { -webkit-line-clamp: 4; overflow-wrap: anywhere; text-overflow: clip; }
+}
+.cg-ev { min-height: 1.45em; }
+.cg-ev.short { padding-top: 1px; padding-bottom: 1px; }
+.cg-ev.short b { -webkit-line-clamp: 1; }

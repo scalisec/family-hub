@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { lanes, hourRange, monthDays, weekStartOf, calSettings, eventsOn } from '../js/calview.js';
+import { lanes, hourRange, hourScale, monthDays, weekStartOf, calSettings, eventsOn } from '../js/calview.js';
 
 const at = (d, h, m = 0) => new Date(2026, 10, d, h, m).getTime();
 
@@ -35,13 +35,26 @@ test('overlapping events sit side by side', () => {
 
 test('the hour range stretches for early games', () => {
   const days = [new Date(2026, 10, 14)];
-  assert.deepEqual(hourRange([{ start: at(14, 6), end: at(14, 7) }], days), [6, 21]);
-  assert.deepEqual(hourRange([{ start: at(14, 3), end: at(14, 23, 30) }], days), [5, 24]);
-  assert.deepEqual(hourRange([], days), [7, 21]);
+  assert.deepEqual(hourRange([{ start: at(14, 17, 30), end: at(14, 19) }, { start: at(14, 9), end: at(14, 10) }], days), [9, 19]);
+  assert.deepEqual(hourRange([{ start: at(14, 18), end: at(14, 19) }], days), [13, 19]); // at least 6 hours
+  assert.deepEqual(hourRange([{ start: at(14, 6), end: at(14, 7) }], days), [6, 12]);
+  assert.deepEqual(hourRange([{ start: at(14, 3), end: at(14, 23, 30) }], days), [3, 24]);
+  assert.deepEqual(hourRange([], days), [8, 20]);
 });
 
 test('multi-day all-day events show on each day', () => {
   const ev = [{ allDay: true, start: at(14, 0), end: at(16, 0), title: 'Tournament' }];
   assert.equal(eventsOn(ev, new Date(2026, 10, 15)).length, 1);
   assert.equal(eventsOn(ev, new Date(2026, 10, 16)).length, 0);
+});
+
+test('empty hours shrink so busy hours get the room', () => {
+  const days = [new Date(2026, 10, 14)];
+  const ev = [{ start: at(14, 9), end: at(14, 10) }, { start: at(14, 17), end: at(14, 19) }];
+  const { at: y, weights } = hourScale(ev, days, 9, 19);
+  assert.equal(weights.filter((w) => w === 1).length, 3);
+  assert.equal(y(9), 0);
+  assert.equal(y(19), 1);
+  assert.ok(y(10) > 0.2, 'the 9 am game gets a big share');
+  assert.ok(y(17) - y(10) < 0.4, 'the empty middle of the day is squeezed');
 });
