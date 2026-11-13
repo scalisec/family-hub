@@ -11,7 +11,7 @@ import { wallLink, relay } from './relay.js';
 import { prepare, isImage } from './photos.js';
 import * as sync from './sync.js';
 import { VERSION, RELEASES, latestVersion, compareVersions, releaseDate } from './version.js';
-import { BASE_THEMES, SEASONAL_THEMES, SWATCHES, AUTO, seasonFor, seasonCalendar } from './themes.js';
+import { BASE_THEMES, SEASONAL_THEMES, TEAM_THEMES, SWATCHES, AUTO, seasonFor, seasonCalendar, gameDayTheme } from './themes.js';
 
 const { state } = sync;
 const ui = {
@@ -58,7 +58,7 @@ function eventsOn(day) {
 /* ---------- frame ---------- */
 
 function applyTheme() {
-  const theme = store.currentTheme(D());
+  const theme = store.currentTheme(D(), new Date(), events());
   document.documentElement.dataset.theme = theme;
   try { localStorage.setItem('fh.themeNow', theme); } catch { /* fine */ }
   const meta = document.querySelector('meta[name="theme-color"]');
@@ -149,7 +149,7 @@ function screen() {
   }
 }
 
-function hasDeco() { const t = store.currentTheme(D()); return SEASONAL_THEMES.includes(t) || t === 'Christmas'; }
+function hasDeco() { const t = store.currentTheme(D(), new Date(), events()); return SEASONAL_THEMES.includes(t) || TEAM_THEMES.includes(t) || t === 'Christmas'; }
 
 function connectBanner() {
   return h('div', { class: 'banner' },
@@ -706,7 +706,7 @@ function themesPage() {
     card(null, h('div', { class: 'stack' },
       toggleRow('Seasonal (auto)', autoOn, (on) => pick(on ? AUTO : store.currentTheme(D()))),
       h('p', { class: 'muted small' }, autoOn
-        ? `Changes by itself through the year. Showing ${store.currentTheme(D())} now${season ? '' : ' (between seasons)'}.`
+        ? `Changes by itself through the year. Showing ${store.currentTheme(D(), new Date(), events())} now${season ? '' : ' (between seasons)'}.`
         : 'Turn on to have the theme follow the seasons and holidays.'),
       autoOn ? field('Between seasons, use', baseSel) : null,
       autoOn ? h('details', { class: 'small' }, h('summary', null, 'When each season shows'),
@@ -714,7 +714,31 @@ function themesPage() {
     h('h3', { class: 'section-title' }, 'Everyday'),
     h('div', { class: 'themes' }, BASE_THEMES.map((n) => tile(n))),
     h('h3', { class: 'section-title' }, 'Seasonal packs'),
-    h('div', { class: 'themes' }, SEASONAL_THEMES.map((n) => tile(n))));
+    h('div', { class: 'themes' }, SEASONAL_THEMES.map((n) => tile(n))),
+    h('h3', { class: 'section-title' }, 'Team themes'),
+    teamThemesCard(),
+    h('div', { class: 'themes' }, TEAM_THEMES.map((n) => tile(n))));
+}
+
+function teamThemesCard() {
+  const saved = store.setting(D(), 'teamThemes', null) || { on: false, list: [] };
+  const feeds = store.live(D(), 'feeds').sort((a, b) => String(a.name).localeCompare(String(b.name)));
+  const save = (patch) => change((d) => store.setSetting(d, 'teamThemes', { ...(store.setting(d, 'teamThemes', null) || { on: false, list: [] }), ...patch }));
+  const calFor = (theme) => (saved.list.find((t) => t.theme === theme) || {}).calendarId || '';
+  const pickers = TEAM_THEMES.map((theme) => {
+    const sel = h('select', { 'aria-label': `${theme} calendar` }, [['', 'No calendar'], ...feeds.map((f) => [f.calendarId, f.name || 'Calendar'])].map(([v, l]) => h('option', { value: v, selected: calFor(theme) === v }, l)));
+    sel.addEventListener('change', () => {
+      const list = TEAM_THEMES.map((t) => ({ theme: t, calendarId: t === theme ? sel.value : calFor(t) })).filter((t) => t.calendarId);
+      save({ list });
+    });
+    return field(`${theme} games come from`, sel);
+  });
+  const today = gameDayTheme(events(), saved.list);
+  return card(null, h('div', { class: 'stack' },
+    toggleRow('Switch to the team theme on game days', Boolean(saved.on), (on) => save({ on })),
+    h('p', { class: 'muted small' }, 'On a day with a game on that team\'s calendar, the app and the wall wear the team\'s colours. If both teams play, it shows whoever plays next. Practices don\'t count.'),
+    saved.on ? h('div', { class: 'stack' }, pickers) : null,
+    saved.on ? h('p', { class: 'small strong' }, today ? `Game day today: ${today}` : 'No team games today.') : null));
 }
 
 function wallPage() {

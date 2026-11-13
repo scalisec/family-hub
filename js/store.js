@@ -5,7 +5,7 @@
 // change wins. That way two people editing different things at once never lose each other's changes.
 
 export const COLLECTIONS = ['people', 'feeds', 'rules', 'recipes', 'meals', 'groceries', 'todos', 'settings'];
-import { THEMES, resolveTheme } from './themes.js';
+import { THEMES, resolveTheme, gameDayTheme } from './themes.js';
 
 export { THEMES };
 export const TILES = [
@@ -154,14 +154,18 @@ export function snapshot(data, now = Date.now()) {
     place: setting(data, 'place', null),
     theme: setting(data, 'theme', 'Rink'),
     themeBase: setting(data, 'themeBase', 'Rink'),
+    teamThemes: setting(data, 'teamThemes', null),
     photos: photoSettings(data),
     layout: layout(data),
     dim: setting(data, 'dim', { from: '22:00', to: '06:00' }),
   };
 }
 
-export function currentTheme(data, date = new Date()) {
-  return resolveTheme(setting(data, 'theme', 'Rink'), setting(data, 'themeBase', 'Rink'), date);
+// events: the calendar feed, for team themes on game days.
+export function currentTheme(data, date = new Date(), events = []) {
+  const teams = setting(data, 'teamThemes', null);
+  const game = teams && teams.on ? gameDayTheme(events, teams.list, date.getTime()) : null;
+  return resolveTheme(setting(data, 'theme', 'Rink'), setting(data, 'themeBase', 'Rink'), date, game);
 }
 
 // Wall photo settings. slideshow: 'off' | 'schedule'. night: show the slideshow instead of dimming.

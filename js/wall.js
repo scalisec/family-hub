@@ -3,7 +3,7 @@
 import { h, icon } from './ui.js';
 import * as dates from './dates.js';
 import { wallFeed, wallPhoto } from './relay.js';
-import { resolveTheme, SEASONAL_THEMES } from './themes.js';
+import { resolveTheme, gameDayTheme, SEASONAL_THEMES, TEAM_THEMES } from './themes.js';
 import { getWeather, cachedWeather, wxIcon } from './weather.js';
 import { VERSION, latestVersion, compareVersions } from './version.js';
 
@@ -207,10 +207,12 @@ function weather() {
 
 function render() {
   const s = snap();
-  const theme = resolveTheme(s.theme || 'Rink', s.themeBase || 'Rink');
+  const teams = s.teamThemes;
+  const game = teams && teams.on ? gameDayTheme((feed && feed.feed && feed.feed.events) || [], teams.list) : null;
+  const theme = resolveTheme(s.theme || 'Rink', s.themeBase || 'Rink', new Date(), game);
   document.documentElement.dataset.theme = theme;
   try { localStorage.setItem('fh.wallTheme', theme); } catch { /* fine */ }
-  const deco = SEASONAL_THEMES.includes(theme) || theme === 'Christmas';
+  const deco = SEASONAL_THEMES.includes(theme) || TEAM_THEMES.includes(theme) || theme === 'Christmas';
   const root = document.getElementById('wall');
   if (!key) {
     root.replaceChildren(h('div', { class: 'wall-msg' }, h('h1', null, 'Family Hub wall'), h('p', null, 'Open the wall link from the app: More > Wall screen > Open.')));

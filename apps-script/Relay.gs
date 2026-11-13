@@ -144,6 +144,7 @@ function cleanSnapshot_(s) {
     ? { name: String(s.place.name || '').slice(0, 80), lat: Number(s.place.lat), lon: Number(s.place.lon) } : null;
   out.theme = String(s.theme || 'Rink').slice(0, 30);
   out.themeBase = String(s.themeBase || 'Rink').slice(0, 30);
+  out.teamThemes = s.teamThemes && typeof s.teamThemes === 'object' ? s.teamThemes : null;
   out.photos = s.photos && typeof s.photos === 'object' ? s.photos : {};
   out.layout = s.layout && typeof s.layout === 'object' ? s.layout : {};
   out.dim = s.dim && typeof s.dim === 'object' ? { from: String(s.dim.from || '22:00'), to: String(s.dim.to || '06:00') } : { from: '22:00', to: '06:00' };
@@ -182,7 +183,7 @@ function syncCalendars() {
           start: ev.getStartTime().getTime(), end: ev.getEndTime().getTime(), allDay: ev.isAllDayEvent(),
           title: tidyTitle_(ev.getTitle(), calName).slice(0, 120),
           location: String(ev.getLocation() || '').replace(/\s*\n\s*/g, ', ').slice(0, 160),
-          person: String(f.person || ''), feed: String(f.name || calName).slice(0, 60),
+          person: String(f.person || ''), feed: String(f.name || calName).slice(0, 60), cal: id,
           color: EVENT_COLORS[String(ev.getColor() || '')] || calColor || ((people[f.person] || {}).color || '')
         });
       });

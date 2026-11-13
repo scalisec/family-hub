@@ -41,3 +41,27 @@ test('auto falls back to the base theme between seasons', () => {
   assert.equal(resolveTheme('Easter', 'Rink', new Date(2026, 10, 12)), 'Easter');
   assert.equal(resolveTheme('Nope'), 'Rink');
 });
+
+import { gameDayTheme, isGame } from '../js/themes.js';
+
+test('what counts as a game', () => {
+  for (const t of ['Game vs Owls', 'Hawks at Bulldogs', 'Tournament: round robin', 'Playoff game 2', 'U10 Blue @ Waterloo']) assert.ok(isGame(t), t);
+  for (const t of ['Practice', 'Practice at Appleby', 'Skills session', 'Team photo', 'Dryland at gym']) assert.ok(!isGame(t), t);
+});
+
+test('team theme on game day: next game wins, then stays until midnight', () => {
+  const day = new Date(2026, 10, 14);
+  const at = (h) => new Date(2026, 10, 14, h).getTime();
+  const teams = [{ theme: 'Barracudas', calendarId: 'g' }, { theme: 'Bulldogs', calendarId: 'l' }];
+  const events = [
+    { cal: 'l', title: 'Game vs Hawks', start: at(9), end: at(10) },
+    { cal: 'g', title: 'Cudas at Owls', start: at(15), end: at(16) },
+    { cal: 'g', title: 'Practice', start: at(18), end: at(19) },
+  ];
+  assert.equal(gameDayTheme(events, teams, at(7)), 'Bulldogs');
+  assert.equal(gameDayTheme(events, teams, at(11)), 'Barracudas');
+  assert.equal(gameDayTheme(events, teams, at(22)), 'Barracudas');
+  assert.equal(gameDayTheme(events, teams, new Date(2026, 10, 15, 9).getTime()), null);
+  assert.equal(gameDayTheme(events, [], at(7)), null);
+  assert.equal(resolveTheme('Night', 'Rink', day, 'Bulldogs'), 'Bulldogs');
+});

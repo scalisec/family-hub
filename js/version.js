@@ -6,6 +6,7 @@ export const RELEASES = [
   { version: '3.1.0', date: '2026-11-12', notes: [
     'Seasonal theme packs: Halloween, Thanksgiving, Winter, Valentine\'s, St. Patrick\'s, Easter, Summer, Back to School and Hockey Playoffs.',
     'Seasonal (auto) changes the theme through the year by itself.',
+    'Team themes: Barracudas and Bulldogs, and an option to wear them automatically on game days.',
     'Shop on Instacart sends the grocery list to Instacart.',
     'Photos for the wall: add many at once from your phone, or a whole folder from a PC. Photo tile and a full-screen slideshow at the times you pick (More > Photos and slideshow).',
   ] },

@@ -3,7 +3,8 @@
 
 export const BASE_THEMES = ['Rink', 'Home', 'Night', 'Christmas'];
 export const SEASONAL_THEMES = ['Halloween', 'Thanksgiving', 'Winter', "Valentine's", "St. Patrick's", 'Easter', 'Summer', 'Back to School', 'Hockey Playoffs'];
-export const THEMES = [...BASE_THEMES, ...SEASONAL_THEMES];
+export const TEAM_THEMES = ['Barracudas', 'Bulldogs'];
+export const THEMES = [...BASE_THEMES, ...SEASONAL_THEMES, ...TEAM_THEMES];
 export const AUTO = 'Seasonal';
 
 // [background, card, accent] for the picker swatches.
@@ -21,6 +22,8 @@ export const SWATCHES = {
   Summer: ['#FFF8E7', '#FFFFFF', '#0284C7'],
   'Back to School': ['#F4F1E8', '#FFFFFF', '#2F5D50'],
   'Hockey Playoffs': ['#F2F5F9', '#FFFFFF', '#C8102E'],
+  Barracudas: ['#0B2545', '#12345E', '#F26B1D'],
+  Bulldogs: ['#EEF2F8', '#FFFFFF', '#1E3A8A'],
 };
 
 // Easter Sunday (Gregorian), as [month 0-11, day].
@@ -73,9 +76,30 @@ export function seasonFor(date = new Date()) {
 }
 
 // What to show: a picked theme as is; Seasonal follows the calendar, else the chosen base.
-export function resolveTheme(choice, base = 'Rink', date = new Date()) {
+export function resolveTheme(choice, base = 'Rink', date = new Date(), gameDay = null) {
+  if (gameDay && TEAM_THEMES.includes(gameDay)) return gameDay;
   if (choice === AUTO) return seasonFor(date) || (THEMES.includes(base) ? base : 'Rink');
   return THEMES.includes(choice) ? choice : 'Rink';
+}
+
+// Game titles: "Game", "vs", "at", tournament and playoff games. Practices never count.
+const GAME = /(^|\W)(game|games|vs\.?|v\.?|at|@|tournament|tourney|playoffs?|finals?|semi-?finals?|exhibition)(\W|$)/i;
+export const isGame = (title) => GAME.test(String(title || '')) && !/practi[cs]e|skills|dryland|evaluation|tryout/i.test(String(title || ''));
+
+// Team theme for today, if one of the picked team calendars has a game today.
+// teams: [{ theme, calendarId }]. events: [{ start, end, title, cal }].
+// Shows from the start of the day; with games for two teams, the next one to finish wins,
+// and after the last game the theme stays until midnight.
+export function gameDayTheme(events, teams, now = Date.now()) {
+  const byCal = new Map((teams || []).filter((t) => t && t.calendarId && TEAM_THEMES.includes(t.theme)).map((t) => [t.calendarId, t.theme]));
+  if (!byCal.size) return null;
+  const day = new Date(now);
+  const a = new Date(day.getFullYear(), day.getMonth(), day.getDate()).getTime();
+  const b = a + 86400000;
+  const games = (events || []).filter((e) => !e.allDay && byCal.has(e.cal) && e.start >= a && e.start < b && isGame(e.title)).sort((x, y) => x.end - y.end);
+  if (!games.length) return null;
+  const next = games.find((g) => g.end > now) || games[games.length - 1];
+  return byCal.get(next.cal);
 }
 
 // Upcoming seasons for the picker ("Halloween from Oct 20").
