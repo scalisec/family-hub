@@ -1,12 +1,12 @@
-name: Deploy to Google Apps Script
+name: Deploy the background helper
 
-# Every push to main that touches src/ uploads the code and updates the live web app.
-# The web app URL never changes. Needs one repo secret: CLASPRC_JSON (see README),
+# Every push to main that touches apps-script/ uploads the helper and updates its live address.
+# The address never changes (the app's js/config.js points at it). Needs one repo secret: CLASPRC_JSON (see README),
 # and .clasp.json pointing at the script inside the Family Hub Data sheet.
 on:
   push:
     branches: [main]
-    paths: ['src/**', '.github/workflows/deploy.yml']
+    paths: ['apps-script/**', '.clasp.json', '.github/workflows/deploy.yml']
   workflow_dispatch:
 
 permissions:
@@ -54,16 +54,16 @@ jobs:
           SHORT="${GITHUB_SHA::7}"
           ID=$(clasp deployments | grep -E '^- ' | grep -v '@HEAD' | head -n 1 | awk '{print $2}')
           if [ -z "$ID" ]; then
-            clasp deploy --description "Family Hub $SHORT"
+            clasp deploy --description "Family Hub helper $SHORT"
             ID=$(clasp deployments | grep -E '^- ' | grep -v '@HEAD' | head -n 1 | awk '{print $2}')
           else
-            clasp deploy --deploymentId "$ID" --description "Family Hub $SHORT"
+            clasp deploy --deploymentId "$ID" --description "Family Hub helper $SHORT"
           fi
           URL="https://script.google.com/macros/s/$ID/exec"
-          echo "Web app: $URL"
+          echo "Helper: $URL"
           {
-            echo "### Family Hub deployed"
+            echo "### Family Hub helper deployed"
             echo ""
-            echo "- Phones and tablet: $URL"
-            echo "- Wall: $URL?view=wall"
+            echo "- Helper address: $URL"
+            echo "- The app itself is on GitHub Pages: https://scalisec.github.io/family-hub/"
           } >> "$GITHUB_STEP_SUMMARY"
