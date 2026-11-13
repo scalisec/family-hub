@@ -2,7 +2,7 @@
 // - Chrome and Edge (PC and Android) fire beforeinstallprompt: keep it so a button can open the real install dialog.
 // - iPhone and iPad have no install API: show Share -> Add to Home Screen.
 // - Already installed (running in its own window): nothing to do.
-let deferred = null;
+let deferred = (typeof window !== 'undefined' && window.__fhInstall) || null;
 const listeners = new Set();
 const notify = () => listeners.forEach((f) => f());
 

@@ -691,7 +691,7 @@ function moreScreen() {
       h('h2', { class: 'page-title' }, title),
       morePage(ui.more));
   }
-  return h('div', { class: 'screen' }, installCard(), card(null, h('div', { class: 'list' }, MORE.map(([key, label, ic]) => row({ onclick: () => openMore(key) },
+  return h('div', { class: 'screen' }, card(null, h('div', { class: 'list' }, MORE.map(([key, label, ic]) => row({ onclick: () => openMore(key) },
     h('span', { class: 'menu-ic' }, icon(ic)), h('div', { class: 'row-value' }, label), icon('chevron', 'tail'))))),
   h('p', { class: 'muted small center' }, `Family Hub ${VERSION}`));
 }
@@ -1129,10 +1129,23 @@ function showUpdate(v) {
   if (document.getElementById('update')) return;
   document.body.append(h('div', { id: 'update', class: 'update' }, h('span', null, `Family Hub ${v} is ready.`),
     h('button', { class: 'btn small', onclick: async () => {
-      try { for (const k of await caches.keys()) await caches.delete(k); } catch { /* fine */ }
-      location.reload();
+      await applyUpdate();
     } }, 'Update')));
 }
+// Gets the newest files: updates the offline helper, clears its saved copies, then reloads.
+async function applyUpdate() {
+  const btn = document.querySelector('#update button');
+  if (btn) { btn.disabled = true; btn.textContent = 'Updating...'; }
+  try {
+    const regs = (await navigator.serviceWorker?.getRegistrations()) || [];
+    for (const r of regs) { try { await r.update(); } catch { /* offline */ } }
+    for (const k of await caches.keys()) await caches.delete(k);
+  } catch { /* fine */ }
+  const url = new URL(location.href);
+  url.searchParams.set('v', String(Date.now()));
+  location.replace(url.href);
+}
+
 async function checkUpdate() { try { const v = await latestVersion(); if (compareVersions(v, VERSION) > 0) showUpdate(v); } catch { /* offline */ } }
 
 /* ---------- weather ---------- */
@@ -1148,7 +1161,7 @@ function startApp() {
   render();
   sync.subscribe((what) => { if (what === 'status') { const top = $('header.top'); if (top) top.replaceWith(header()); return; } refresh(); });
   onGoogle(() => refresh());
-  onInstallChange(() => { if (ui.tab === 'more') refresh(); });
+  onInstallChange(() => { if (ui.tab === 'more' && ui.more === 'about') refresh(); });
   document.addEventListener('focusout', () => setTimeout(() => { if (ui.stale && !document.querySelector('.sheet-wrap')) refresh(); }, 50));
   new MutationObserver(() => { if (ui.stale && !document.querySelector('.sheet-wrap')) refresh(); }).observe(document.body, { childList: true });
   sync.start();

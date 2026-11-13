@@ -1,8 +1,9 @@
 // The app's version and release history (newest first). Keep VERSION, package.json and
 // version.json in step: the tests check they match.
-export const VERSION = '3.1.1';
+export const VERSION = '3.1.2';
 
 export const RELEASES = [
+  { version: '3.1.2', date: '2026-11-12', notes: ['The Update button now always gets the newest version.', 'Install button moved to More > About and updates.'] },
   { version: '3.1.1', date: '2026-11-12', notes: ['Install button in More: puts Family Hub on your home screen like a regular app.'] },
   { version: '3.1.0', date: '2026-11-12', notes: [
     'Seasonal theme packs: Halloween, Thanksgiving, Winter, Valentine\'s, St. Patrick\'s, Easter, Summer, Back to School and Hockey Playoffs.',

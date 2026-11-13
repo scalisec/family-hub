@@ -1,7 +1,7 @@
-// Family Hub offline helper: keeps the app's own files so it opens instantly, even with no signal.
-// It serves the saved copy straight away and fetches a fresh one in the background for next time.
-// It never touches Google, the helper, or the weather: those always go to the network.
-const CACHE = 'fh-shell-3.1.1';
+// Family Hub offline helper. Always asks GitHub for the newest copy of the app's own files
+// (a quick "has it changed?" check), and falls back to the saved copy when there's no signal,
+// so the app still opens offline. It never touches Google, the helper, or the weather.
+const CACHE = 'fh-shell-3.1.2';
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((c) => c.addAll(['./', 'index.html', 'css/app.css', 'js/app.js'])).catch(() => {}));
@@ -19,12 +19,17 @@ self.addEventListener('fetch', (event) => {
   const req = event.request;
   const url = new URL(req.url);
   if (req.method !== 'GET' || url.origin !== self.location.origin) return;
-  if (url.pathname.endsWith('/version.json') || url.pathname.endsWith('/wall.html')) return;
+  if (url.pathname.endsWith('/version.json')) return;
   event.respondWith((async () => {
     const cache = await caches.open(CACHE);
-    const hit = await cache.match(req, { ignoreSearch: true });
-    const fresh = fetch(req).then((res) => { if (res.ok) cache.put(req, res.clone()); return res; }).catch(() => null);
-    if (hit) { event.waitUntil(fresh); return hit; }
-    return (await fresh) || new Response('Offline', { status: 503 });
+    try {
+      // no-cache: check with GitHub every time instead of trusting the browser's 10-minute copy.
+      const res = await fetch(req, { cache: 'no-cache' });
+      if (res.ok) cache.put(req, res.clone());
+      return res;
+    } catch {
+      const hit = await cache.match(req, { ignoreSearch: true });
+      return hit || new Response('Offline', { status: 503 });
+    }
   })());
 });
