@@ -72,6 +72,29 @@ function week() {
   });
 }
 
+// One thin line: date and clock, the next leave-by, and the weather.
+function slimBar(now, theme) {
+  const t = Date.now();
+  const next = ((feed && feed.feed && feed.feed.nextUp) || []).find((e) => e.start > t && (e.leave || e.arriveBy));
+  const logo = (snap().teamLogos || {})[theme];
+  let pill = null;
+  if (next) {
+    const when = next.leave || next.arriveBy;
+    const soon = next.leave && next.leave - t < 45 * 60000;
+    pill = h('div', { class: `sb-pill${soon ? ' soon' : ''}` }, icon(next.leave ? 'car' : 'clock'),
+      h('b', null, `${next.leave ? 'Leave by' : 'Be there by'} ${dates.time(when)}`),
+      h('span', null, ` ${next.title}`), ' ', tag(next.person),
+      dates.dateKey(new Date(next.start)) !== dates.dateKey(now) ? h('span', { class: 'muted' }, ` \u00b7 ${dates.dayLabel(new Date(next.start))}`) : null);
+  }
+  return h('header', { class: 'slimbar' },
+    h('div', { class: 'sb-left' }, logo ? h('img', { class: 'sb-logo', src: logo, alt: '' }) : null,
+      h('span', { class: 'sb-date' }, now.toLocaleDateString('en-CA', { weekday: 'long', month: 'long', day: 'numeric' })),
+      h('span', { class: 'sb-clock' }, dates.time(now.getTime())),
+      problem ? h('span', { class: 'w-warn' }, problem) : null),
+    pill,
+    wx ? h('div', { class: 'sb-wx' }, icon(wxIcon(wx.code), 'wx-ic'), h('b', null, `${wx.temp}\u00b0`), h('span', { class: 'muted' }, wx.wear)) : h('span'));
+}
+
 function calendarTile() {
   const o = calSettings(snap().calendar);
   const evs = (feed && feed.feed && feed.feed.events) || [];
@@ -245,6 +268,14 @@ function render() {
     return;
   }
   const now = new Date();
+  if (calSettings(s.calendar).wallView === 'week') {
+    root.replaceChildren(h('div', { class: 'wall wall-full' },
+      deco ? h('div', { class: 'deco-band', 'aria-hidden': 'true' }) : null,
+      slimBar(now, theme),
+      calendarTile()));
+    dim();
+    return;
+  }
   root.replaceChildren(h('div', { class: 'wall' },
     deco ? h('div', { class: 'deco-band', 'aria-hidden': 'true' }) : null,
     h('header', { class: 'w-head' },

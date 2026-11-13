@@ -471,3 +471,37 @@ body.wallpage { font-size: 1.04vw; }
   .cc-t .ptag { display: none; }
   .cc-dinner { display: none; }
 }
+
+/* Phone and tablet: full-screen week */
+main#main.cal-full { padding: calc(6px + env(safe-area-inset-top)) 6px calc(76px + env(safe-area-inset-bottom)); overflow: hidden; display: flex; flex-direction: column; }
+main#main.cal-full > .cal-screen { flex: 1; min-height: 0; gap: 4px; }
+.cal-bar { display: flex; align-items: center; gap: 2px; padding: 0 2px; }
+.cal-bar .grow { flex: 1; }
+.cal-bar-title { background: none; border: 0; font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 1.05rem; padding: 6px 4px; white-space: nowrap; }
+.view-pick { width: auto; min-height: 36px; padding: 4px 8px; border-radius: 10px; font-weight: 600; font-size: .88rem; margin-left: 6px; }
+.who-pick { padding: 6px 10px; }
+.cal-screen > .cal-card { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 4px 4px 6px; border-radius: 16px; }
+.cal-screen > .cal-card > .calgrid, .cal-screen > .cal-card > .calcols { flex: 1; min-height: 0; }
+.cal-screen .calgrid { display: flex; flex-direction: column; }
+.cal-screen .cg-body { flex: 1; height: auto; min-height: 0; }
+.cal-screen .calcols { min-height: 0; overflow-y: auto; }
+@media (min-width: 1000px) { main#main.cal-full { padding: 12px 16px 16px; } }
+
+/* Wall: full-screen week */
+.wall.wall-full { gap: .8vw; padding: 1vw 1.4vw 1.2vw; }
+.slimbar { display: flex; align-items: center; justify-content: space-between; gap: 1.5em; font-size: 1.25em; background: var(--card); border: 1px solid var(--line); border-radius: 1em; padding: .45em 1em; }
+.sb-left { display: flex; align-items: baseline; gap: .8em; white-space: nowrap; }
+.sb-logo { height: 1.9em; align-self: center; }
+.sb-date { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 1.15em; }
+.sb-clock { font-weight: 700; color: var(--accent); }
+.sb-pill { display: flex; align-items: center; gap: .35em; background: var(--accent-soft); border-radius: 999px; padding: .3em .9em; white-space: nowrap; overflow: hidden; }
+.sb-pill .ic { width: 1.1em; height: 1.1em; color: var(--accent); }
+.sb-pill.soon { background: var(--warn-bg); color: var(--warn); }
+.sb-pill.soon .ic { color: var(--warn); }
+.sb-wx { display: flex; align-items: center; gap: .5em; white-space: nowrap; }
+.sb-wx .wx-ic { width: 1.5em; height: 1.5em; }
+.sb-wx .muted { font-size: .85em; }
+.wall-full > .card { flex: 1; min-height: 0; }
+.wall-full .calgrid { font-size: .95em; }
+.wall-full .cg-ev b { font-size: 1em; }
+.wall-full .calcols { font-size: 1em; }

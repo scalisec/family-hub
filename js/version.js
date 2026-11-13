@@ -1,8 +1,9 @@
 // The app's version and release history (newest first). Keep VERSION, package.json and
 // version.json in step: the tests check they match.
-export const VERSION = '3.2.0';
+export const VERSION = '3.2.1';
 
 export const RELEASES = [
+  { version: '3.2.1', date: '2026-11-13', notes: ['Week view goes full screen: on the phone just one slim toolbar, and on the wall just a thin bar with the date, clock, next leave-by time and weather.'] },
   { version: '3.2.0', date: '2026-11-13', notes: [
     'Real calendar views: Week (time grid or 7 columns) and Month, with arrows to look ahead or back. The old list is still there.',
     'Tap an event for details and a map link, or a day for its events and dinner.',

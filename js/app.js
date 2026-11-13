@@ -124,10 +124,11 @@ function go(tab) {
 function render({ animate = false } = {}) {
   applyTheme();
   const root = $('#app');
-  const main = h('main', { id: 'main', class: animate ? 'enter' : '' }, screen());
+  const full = ui.tab === 'week' && (ui.calView || 'week') === 'week';
+  const main = h('main', { id: 'main', class: `${animate ? 'enter' : ''}${full ? ' cal-full' : ''}` }, screen());
   const banner = !isConnected() && !ui.connecting ? connectBanner() : null;
   const deco = hasDeco() ? h('div', { class: 'deco-band', 'aria-hidden': 'true' }) : null;
-  root.replaceChildren(...[header(), deco, banner, main, fab(), tabbar()].filter(Boolean));
+  root.replaceChildren(...[full ? null : header(), full ? null : deco, banner, main, full ? null : fab(), tabbar()].filter(Boolean));
   const y = ui.scroll[ui.tab] || 0;
   if (y) main.scrollTop = y;
   ui.stale = false;
@@ -446,6 +447,24 @@ function weekScreen() {
     render();
   };
   const atNow = view === 'month' ? !ui.monthOffset : view === 'week' ? !ui.weekOffset : !ui.weekPart;
+  const viewPick = h('select', { class: 'view-pick', 'aria-label': 'Calendar view' }, [['week', 'Week'], ['month', 'Month'], ['list', 'List']].map(([v, l]) => h('option', { value: v, selected: v === view }, l)));
+  viewPick.addEventListener('change', () => { ui.calView = viewPick.value; sessionStorage.setItem('fh.calView', viewPick.value); render(); });
+  const whoName2 = filter === 'all' ? 'Everyone' : ((person(filter) || {}).name || 'Everyone').split(' ')[0];
+  const whoBtn = h('button', { class: 'chip who-pick', onclick: () => sheet('Show events for', h('div', { class: 'list' },
+    [['all', 'Everyone'], ...ppl.map((p) => [p.id, p.name])].map(([id, name]) => row({ class: `row${filter === id ? ' on' : ''}`, onclick: () => { ui.weekWho = id; closeSheet(); render(); } },
+      id !== 'all' ? h('span', { class: 'dot', style: { background: (person(id) || {}).color } }) : h('span', { class: 'dot', style: { background: 'var(--muted)' } }), h('div', { class: 'row-value' }, name))))) },
+    filter !== 'all' ? h('span', { class: 'dot', style: { background: (person(filter) || {}).color } }) : null, whoName2);
+  if (view === 'week') {
+    return h('div', { class: 'screen cal-screen' },
+      h('div', { class: 'cal-bar' },
+        h('button', { class: 'icon-btn', 'aria-label': 'Earlier', onclick: () => shift(-1) }, icon('back')),
+        h('button', { class: 'cal-bar-title', onclick: () => { ui.weekOffset = 0; render(); }, title: 'Back to this week' }, title, !atNow ? h('span', { class: 'muted small' }, ' \u00b7 Today') : null),
+        h('button', { class: 'icon-btn', 'aria-label': 'Later', onclick: () => shift(1) }, icon('chevron')),
+        h('span', { class: 'grow' }),
+        whoBtn, viewPick),
+      !state.feed ? h('p', { class: 'muted small pad' }, isConnected() ? 'Reading your calendars...' : 'Connect Google to see your calendars.') : null,
+      body);
+  }
   return h('div', { class: 'screen' },
     h('div', { class: 'toolbar' },
       segmented([['week', 'Week'], ['month', 'Month'], ['list', 'List']], view, (v) => { ui.calView = v; sessionStorage.setItem('fh.calView', v); render(); })),
