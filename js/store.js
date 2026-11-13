@@ -5,7 +5,9 @@
 // change wins. That way two people editing different things at once never lose each other's changes.
 
 export const COLLECTIONS = ['people', 'feeds', 'rules', 'recipes', 'meals', 'groceries', 'todos', 'settings'];
-export const THEMES = ['Rink', 'Home', 'Night', 'Christmas'];
+import { THEMES, resolveTheme } from './themes.js';
+
+export { THEMES };
 export const TILES = [
   ['nextUp', 'Next up and leave-by'],
   ['week', 'This week'],
@@ -151,8 +153,28 @@ export function snapshot(data, now = Date.now()) {
     homeAddress: setting(data, 'homeAddress', ''),
     place: setting(data, 'place', null),
     theme: setting(data, 'theme', 'Rink'),
+    themeBase: setting(data, 'themeBase', 'Rink'),
+    photos: photoSettings(data),
     layout: layout(data),
     dim: setting(data, 'dim', { from: '22:00', to: '06:00' }),
+  };
+}
+
+export function currentTheme(data, date = new Date()) {
+  return resolveTheme(setting(data, 'theme', 'Rink'), setting(data, 'themeBase', 'Rink'), date);
+}
+
+// Wall photo settings. slideshow: 'off' | 'schedule'. night: show the slideshow instead of dimming.
+export function photoSettings(data) {
+  const s = setting(data, 'photos', {});
+  return {
+    tile: s.tile !== false,
+    slideshow: s.slideshow === 'schedule' ? 'schedule' : 'off',
+    from: s.from || '19:00',
+    to: s.to || '20:30',
+    days: ['all', 'weekdays', 'weekends'].includes(s.days) ? s.days : 'all',
+    night: Boolean(s.night),
+    every: [10, 20, 30, 60, 120].includes(Number(s.every)) ? Number(s.every) : 30,
   };
 }
 

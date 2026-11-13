@@ -1,8 +1,14 @@
 // The app's version and release history (newest first). Keep VERSION, package.json and
 // version.json in step: the tests check they match.
-export const VERSION = '3.0.1';
+export const VERSION = '3.1.0';
 
 export const RELEASES = [
+  { version: '3.1.0', date: '2026-11-12', notes: [
+    'Seasonal theme packs: Halloween, Thanksgiving, Winter, Valentine\'s, St. Patrick\'s, Easter, Summer, Back to School and Hockey Playoffs.',
+    'Seasonal (auto) changes the theme through the year by itself.',
+    'Shop on Instacart sends the grocery list to Instacart.',
+    'Photos for the wall: add many at once from your phone, or a whole folder from a PC. Photo tile and a full-screen slideshow at the times you pick (More > Photos and slideshow).',
+  ] },
   { version: '3.0.1', date: '2026-11-12', notes: ['Fixed a stray "null" under the title.', 'Lunch labels use first names.', 'Leave-by times ignore a drive over 3 hours (a vague location that matched the wrong place).'] },
   { version: '3.0.0', date: '2026-11-12', notes: [
     'Rebuilt as a real app: opens instantly, every tap answers straight away, and changes save in the background.',

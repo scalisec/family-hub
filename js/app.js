@@ -7,9 +7,11 @@ import { parse, splitItems } from './parse.js';
 import { getWeather, cachedWeather, findPlace, wxIcon } from './weather.js';
 import { connect, disconnect, isConnected, wasConnected, accountEmail, setAccountEmail, gjson, onChange as onGoogle } from './google.js';
 import { folderLink } from './drive.js';
-import { wallLink } from './relay.js';
+import { wallLink, relay } from './relay.js';
+import { prepare, isImage } from './photos.js';
 import * as sync from './sync.js';
 import { VERSION, RELEASES, latestVersion, compareVersions, releaseDate } from './version.js';
+import { BASE_THEMES, SEASONAL_THEMES, SWATCHES, AUTO, seasonFor, seasonCalendar } from './themes.js';
 
 const { state } = sync;
 const ui = {
@@ -56,8 +58,9 @@ function eventsOn(day) {
 /* ---------- frame ---------- */
 
 function applyTheme() {
-  const theme = store.setting(D(), 'theme', 'Rink');
+  const theme = store.currentTheme(D());
   document.documentElement.dataset.theme = theme;
+  try { localStorage.setItem('fh.themeNow', theme); } catch { /* fine */ }
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) meta.setAttribute('content', getComputedStyle(document.documentElement).getPropertyValue('--bg').trim() || '#EEF3F9');
 }
@@ -120,7 +123,8 @@ function render({ animate = false } = {}) {
   const root = $('#app');
   const main = h('main', { id: 'main', class: animate ? 'enter' : '' }, screen());
   const banner = !isConnected() && !ui.connecting ? connectBanner() : null;
-  root.replaceChildren(...[header(), banner, main, fab(), tabbar()].filter(Boolean));
+  const deco = hasDeco() ? h('div', { class: 'deco-band', 'aria-hidden': 'true' }) : null;
+  root.replaceChildren(...[header(), deco, banner, main, fab(), tabbar()].filter(Boolean));
   const y = ui.scroll[ui.tab] || 0;
   if (y) main.scrollTop = y;
   ui.stale = false;
@@ -144,6 +148,8 @@ function screen() {
     default: return todayScreen();
   }
 }
+
+function hasDeco() { const t = store.currentTheme(D()); return SEASONAL_THEMES.includes(t) || t === 'Christmas'; }
 
 function connectBanner() {
   return h('div', { class: 'banner' },
@@ -555,8 +561,29 @@ function groceriesView() {
       addGroceries(r.kind === 'grocery' ? r.items : splitItems(v));
     }),
     card(null, open.length ? h('div', { class: 'list' }, open.map(groceryRow)) : empty('The list is empty.')),
+    open.length ? h('button', { class: 'btn instacart', onclick: () => shopInstacart(open) }, icon('cart'), 'Shop on Instacart') : null,
     done.length ? card(`In the cart (${done.length})`, h('div', { class: 'list' }, done.map(groceryRow)),
       h('button', { class: 'link', onclick: () => { const ids = done.map((g) => g.id); change((d) => ids.reduce((x, id) => store.remove(x, 'groceries', id), d)); toast('Cleared'); } }, 'Clear')) : null);
+}
+
+async function shopInstacart(items) {
+  const names = items.map((g) => g.text);
+  // Open the window straight away (inside the tap) so the browser doesn't block it.
+  const win = window.open('', '_blank');
+  let url = '';
+  try {
+    if (isConnected()) url = (await relay('instacart', { items: names, title: `Family Hub groceries, ${dates.shortDate(new Date())}` })).url;
+  } catch (err) { toast(err.message, { ms: 5000 }); }
+  if (!url) {
+    try { await navigator.clipboard.writeText(names.join('\n')); } catch { /* fine */ }
+    url = `https://www.instacart.ca/store/s?k=${encodeURIComponent(names[0])}`;
+    toast('List copied. Search each item in Instacart.', { ms: 5000 });
+  }
+  if (win) win.location.href = url; else location.href = url;
+  setTimeout(() => sheet('Back from Instacart?', h('p', null, 'Move everything you ordered to "In the cart"?'), { actions: [
+    h('button', { class: 'btn ghost', onclick: () => closeSheet() }, 'Not yet'),
+    h('button', { class: 'btn', onclick: () => { const ids = items.map((g) => g.id); change((d) => ids.reduce((x, id) => store.put(x, 'groceries', { id, done: true }), d)); closeSheet(); toast('Moved to the cart'); } }, 'Yes, all'),
+  ] }), 1500);
 }
 
 function groceryRow(g) {
@@ -620,6 +647,7 @@ function todoEdit(id) {
 const MORE = [
   ['themes', 'Themes', 'palette'],
   ['wall', 'Wall screen', 'tv'],
+  ['photos', 'Photos and slideshow', 'image'],
   ['people', 'People', 'people'],
   ['calendars', 'Calendars', 'calendar'],
   ['rules', 'Arrival times', 'clock'],
@@ -647,6 +675,7 @@ function morePage(page) {
   switch (page) {
     case 'themes': return themesPage();
     case 'wall': return wallPage();
+    case 'photos': return photosPage();
     case 'people': return peoplePage();
     case 'calendars': return calendarsPage();
     case 'rules': return rulesPage();
@@ -657,12 +686,35 @@ function morePage(page) {
   }
 }
 
+function swatch(name) {
+  const [a, b, c] = SWATCHES[name] || SWATCHES.Rink;
+  return h('div', { class: 'swatch' }, h('span', { style: { background: a } }), h('span', { style: { background: b } }), h('span', { style: { background: c } }));
+}
+
 function themesPage() {
   const cur = store.setting(D(), 'theme', 'Rink');
-  return h('div', { class: 'themes' }, store.THEMES.map((name) => h('button', {
-    class: `theme${cur === name ? ' on' : ''}`, 'data-theme-preview': name, 'aria-pressed': String(cur === name),
-    onclick: () => { change((d) => store.setSetting(d, 'theme', name)); haptic(); },
-  }, h('div', { class: 'swatch' }, h('span', { class: 's1' }), h('span', { class: 's2' }), h('span', { class: 's3' })), h('div', { class: 'strong' }, name), cur === name ? h('div', { class: 'small muted' }, 'In use') : null)));
+  const base = store.setting(D(), 'themeBase', 'Rink');
+  const season = seasonFor(new Date());
+  const pick = (name) => { change((d) => store.setSetting(d, 'theme', name)); haptic(); };
+  const tile = (name, note) => h('button', {
+    class: `theme${cur === name ? ' on' : ''}`, 'aria-pressed': String(cur === name), onclick: () => pick(name),
+  }, swatch(name), h('div', { class: 'strong' }, name), h('div', { class: 'small muted' }, cur === name ? 'In use' : note || ''));
+  const autoOn = cur === AUTO;
+  const baseSel = h('select', { 'aria-label': 'Theme between seasons' }, BASE_THEMES.filter((t) => t !== 'Christmas').map((t) => h('option', { value: t, selected: base === t }, t)));
+  baseSel.addEventListener('change', () => change((d) => store.setSetting(d, 'themeBase', baseSel.value)));
+  return h('div', { class: 'stack' },
+    card(null, h('div', { class: 'stack' },
+      toggleRow('Seasonal (auto)', autoOn, (on) => pick(on ? AUTO : store.currentTheme(D()))),
+      h('p', { class: 'muted small' }, autoOn
+        ? `Changes by itself through the year. Showing ${store.currentTheme(D())} now${season ? '' : ' (between seasons)'}.`
+        : 'Turn on to have the theme follow the seasons and holidays.'),
+      autoOn ? field('Between seasons, use', baseSel) : null,
+      autoOn ? h('details', { class: 'small' }, h('summary', null, 'When each season shows'),
+        h('div', { class: 'list' }, seasonCalendar().map(([n, when]) => h('div', { class: 'cal-row' }, h('span', { class: 'strong' }, n), h('span', { class: 'muted' }, when))))) : null)),
+    h('h3', { class: 'section-title' }, 'Everyday'),
+    h('div', { class: 'themes' }, BASE_THEMES.map((n) => tile(n))),
+    h('h3', { class: 'section-title' }, 'Seasonal packs'),
+    h('div', { class: 'themes' }, SEASONAL_THEMES.map((n) => tile(n))));
 }
 
 function wallPage() {
@@ -684,6 +736,136 @@ function wallPage() {
         h('button', { class: 'btn ghost', onclick: () => confirmSheet('Make a new wall link?', 'The old link stops working straight away. You\'ll need to open the new one on the wall screen.', 'New link', async () => { try { await sync.rotateWallKey(); toast('New wall link ready'); } catch (err) { toast(err.message); } }) }, icon('sync'), 'New link')) : null)),
     card('What the wall shows', h('div', { class: 'list' }, store.TILES.map(([key, label]) => toggleRow(label, lay[key], (on) => change((d) => store.setSetting(d, 'layout', { ...store.layout(d), [key]: on })))))),
     card('Night dimming', h('div', { class: 'btn-row' }, field('Dim from', from), field('Until', to))));
+}
+
+/* ---------- Photos ---------- */
+
+const photoState = { list: null, thumbs: {}, loading: false, queue: [], done: 0, failed: [], busy: false, selecting: false, picked: new Set() };
+
+async function loadPhotos(force = false) {
+  if (!isConnected() || photoState.loading || (photoState.list && !force)) return;
+  photoState.loading = true;
+  try {
+    const r = await relay('photoList');
+    photoState.list = r.photos.sort((a, b) => b.added - a.added);
+    photoState.thumbs = r.thumbs || {};
+  } catch (err) { photoState.error = err.message; }
+  photoState.loading = false;
+  if (ui.tab === 'more' && ui.more === 'photos') refresh();
+}
+
+function addPhotos(files) {
+  const have = new Set((photoState.list || []).map((p) => p.key));
+  const fresh = [...files].filter(isImage).filter((f) => !have.has(`${f.name}|${f.size}|${f.lastModified}`));
+  const skipped = files.length - fresh.length;
+  if (!fresh.length) { toast(skipped ? 'Those photos are already on the wall, or aren\'t photos.' : 'No photos picked.'); return; }
+  photoState.queue.push(...fresh);
+  if (skipped) toast(`${skipped} skipped (already added or not a photo)`);
+  runQueue();
+}
+
+async function runQueue() {
+  if (photoState.busy) return;
+  photoState.busy = true;
+  photoState.done = 0;
+  photoState.failed = [];
+  refreshPhotosPage();
+  while (photoState.queue.length) {
+    const file = photoState.queue.shift();
+    try {
+      const prepared = await prepare(file);
+      const r = await relay('photoAdd', prepared);
+      photoState.list = [r.photo, ...(photoState.list || []).filter((p) => p.id !== r.photo.id)];
+      photoState.thumbs[r.photo.id] = prepared.thumb;
+      photoState.done += 1;
+    } catch (err) {
+      photoState.failed.push(`${file.name}: ${err.message}`);
+      if (err.code === 'not-connected') { photoState.queue = []; break; }
+    }
+    refreshPhotosPage();
+  }
+  photoState.busy = false;
+  toast(`${photoState.done} photo${photoState.done === 1 ? '' : 's'} added${photoState.failed.length ? `, ${photoState.failed.length} didn't work` : ''}`);
+  refreshPhotosPage();
+}
+
+function refreshPhotosPage() {
+  if (ui.tab === 'more' && ui.more === 'photos' && !document.querySelector('.sheet-wrap')) {
+    ui.scroll.more = $('#main')?.scrollTop || 0;
+    render();
+  }
+}
+
+function photosPage() {
+  if (!photoState.list) loadPhotos();
+  const ps = store.photoSettings(D());
+  const setP = (patch) => change((d) => store.setSetting(d, 'photos', { ...store.photoSettings(d), ...patch }));
+  const pickFiles = h('input', { type: 'file', accept: 'image/*', multiple: true, hidden: true });
+  pickFiles.addEventListener('change', () => { addPhotos(pickFiles.files); pickFiles.value = ''; });
+  const pickFolder = h('input', { type: 'file', webkitdirectory: true, multiple: true, hidden: true });
+  pickFolder.addEventListener('change', () => { addPhotos(pickFolder.files); pickFolder.value = ''; });
+  const canFolder = 'webkitdirectory' in pickFolder && !/Android|iPhone|iPad/i.test(navigator.userAgent);
+  const from = h('input', { type: 'time', value: ps.from });
+  const to = h('input', { type: 'time', value: ps.to });
+  from.addEventListener('change', () => setP({ from: from.value || '19:00' }));
+  to.addEventListener('change', () => setP({ to: to.value || '20:30' }));
+  const days = h('select', null, [['all', 'Every day'], ['weekdays', 'Weekdays'], ['weekends', 'Weekends']].map(([v, l]) => h('option', { value: v, selected: ps.days === v }, l)));
+  days.addEventListener('change', () => setP({ days: days.value }));
+  const every = h('select', null, [[10, '10 seconds'], [20, '20 seconds'], [30, '30 seconds'], [60, '1 minute'], [120, '2 minutes']].map(([v, l]) => h('option', { value: String(v), selected: ps.every === v }, l)));
+  every.addEventListener('change', () => setP({ every: Number(every.value) }));
+
+  const list = photoState.list || [];
+  const sel = photoState.selecting;
+  const grid = h('div', { class: 'photo-grid' }, list.map((p) => {
+    const t = photoState.thumbs[p.id];
+    const on = photoState.picked.has(p.id);
+    return h('button', { class: `ph${on ? ' on' : ''}`, 'aria-label': p.name || 'Photo', onclick: () => {
+      if (!sel) { photoState.selecting = true; photoState.picked = new Set([p.id]); render(); return; }
+      if (on) photoState.picked.delete(p.id); else photoState.picked.add(p.id);
+      render();
+    } }, t ? h('img', { src: `data:image/jpeg;base64,${t}`, alt: '', loading: 'lazy' }) : h('span', { class: 'ph-blank' }), sel ? h('span', { class: 'ph-check' }, icon('check')) : null);
+  }));
+  const deleteSel = () => {
+    const ids = [...photoState.picked];
+    confirmSheet(`Remove ${ids.length} photo${ids.length === 1 ? '' : 's'}?`, 'They come off the wall. The copies are moved to the trash in your Drive (Family Hub Photos), where they stay for 30 days.', 'Remove', async () => {
+      try {
+        await relay('photoDelete', { ids });
+        photoState.list = list.filter((p) => !photoState.picked.has(p.id));
+        photoState.selecting = false;
+        photoState.picked = new Set();
+        toast('Removed');
+        render();
+      } catch (err) { toast(err.message); }
+    });
+  };
+
+  return h('div', { class: 'stack' },
+    card('Add photos', h('div', { class: 'stack' },
+      h('p', { class: 'muted small' }, canFolder
+        ? 'Pick photos, or a whole folder. They\'re shrunk to screen size and kept privately in your Drive (Family Hub Photos).'
+        : 'Pick as many as you like: tap and hold one, then tap the rest, or choose a whole album. They\'re shrunk to screen size and kept privately in your Drive.'),
+      !isConnected() ? h('p', { class: 'warn-text' }, 'Connect Google to add photos.') : null,
+      h('div', { class: 'btn-row' },
+        h('button', { class: 'btn', disabled: !isConnected(), onclick: () => pickFiles.click() }, icon('image'), 'Add photos'),
+        canFolder ? h('button', { class: 'btn ghost', disabled: !isConnected(), onclick: () => pickFolder.click() }, icon('folder'), 'Import a folder') : null,
+        pickFiles, pickFolder),
+      photoState.busy ? h('div', { class: 'progress' },
+        h('div', { class: 'small strong' }, `Adding photos: ${photoState.done} done, ${photoState.queue.length + 1} to go`),
+        h('div', { class: 'bar-track' }, h('div', { class: 'bar-fill', style: { width: `${Math.round((photoState.done / (photoState.done + photoState.queue.length + 1)) * 100)}%` } })),
+        h('div', { class: 'muted small' }, 'Keep this screen open until it finishes.')) : null,
+      photoState.failed.length && !photoState.busy ? h('details', { class: 'small' }, h('summary', null, `${photoState.failed.length} didn't work`), h('ul', null, photoState.failed.map((f) => h('li', null, f)))) : null)),
+    card('On the wall', h('div', { class: 'list' },
+      toggleRow('Photo tile', ps.tile, (on) => setP({ tile: on })),
+      toggleRow('Full-screen slideshow at set times', ps.slideshow === 'schedule', (on) => setP({ slideshow: on ? 'schedule' : 'off' })),
+      ps.slideshow === 'schedule' ? h('div', { class: 'btn-row pad' }, field('From', from), field('Until', to), field('Days', days)) : null,
+      toggleRow('Slideshow instead of dimming at night', ps.night, (on) => setP({ night: on })),
+      h('div', { class: 'pad' }, field('Change photo every', every)))),
+    card(`Your photos${list.length ? ` (${list.length})` : ''}`,
+      photoState.loading && !list.length ? h('p', { class: 'muted' }, 'Loading...')
+        : list.length ? h('div', { class: 'stack' }, grid, h('p', { class: 'muted small' }, sel ? 'Tap photos to pick them.' : 'Tap a photo to start picking ones to remove.')) : empty(isConnected() ? 'No photos yet.' : 'Connect Google to see your photos.'),
+      sel ? h('div', { class: 'btn-row' },
+        h('button', { class: 'link', onclick: () => { photoState.selecting = false; photoState.picked = new Set(); render(); } }, 'Cancel'),
+        h('button', { class: 'btn small danger-fill', disabled: !photoState.picked.size, onclick: deleteSel }, icon('trash'), `Remove ${photoState.picked.size || ''}`)) : null));
 }
 
 function toggleRow(label, on, onSet) {

@@ -194,10 +194,6 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); box-sha
 .theme.on { border-color: var(--accent); }
 .swatch { display: flex; height: 54px; border-radius: 12px; overflow: hidden; margin-bottom: 8px; border: 1px solid rgba(0,0,0,.06); }
 .swatch span { flex: 1; }
-[data-theme-preview="Rink"] .s1 { background: #EEF3F9; } [data-theme-preview="Rink"] .s2 { background: #FFFFFF; } [data-theme-preview="Rink"] .s3 { background: #1D4ED8; }
-[data-theme-preview="Home"] .s1 { background: #F6F0E8; } [data-theme-preview="Home"] .s2 { background: #FFFDFA; } [data-theme-preview="Home"] .s3 { background: #A8480F; }
-[data-theme-preview="Night"] .s1 { background: #0B1220; } [data-theme-preview="Night"] .s2 { background: #131C2E; } [data-theme-preview="Night"] .s3 { background: #7FB4FF; }
-[data-theme-preview="Christmas"] .s1 { background: #EFE7DA; } [data-theme-preview="Christmas"] .s2 { background: #166534; } [data-theme-preview="Christmas"] .s3 { background: #B91C1C; }
 .linkbox { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .78rem; word-break: break-all; background: var(--chip); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; user-select: all; }
 .toggle { justify-content: space-between; }
 .switch { width: 46px; height: 28px; border-radius: 999px; background: var(--line); position: relative; flex-shrink: 0; transition: background-color .18s; }
@@ -209,6 +205,8 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); box-sha
 .color.on { box-shadow: 0 0 0 3px var(--ink); }
 .cal-row { display: flex; align-items: center; gap: 10px; justify-content: space-between; padding: 10px 0; flex-wrap: wrap; }
 .cal-row select { width: auto; min-width: 130px; min-height: 40px; }
+.section-title { font-size: 1rem; margin: 6px 2px 0; color: var(--muted); }
+details summary { cursor: pointer; font-weight: 600; color: var(--accent); padding: 4px 0; }
 .releases { display: flex; flex-direction: column; gap: 12px; }
 .release ul { margin: 6px 0 0; padding-left: 20px; color: var(--muted); }
 
@@ -305,3 +303,76 @@ body.dimmed #dim { opacity: .7; }
   .wall { height: auto; }
   .w-cols { grid-template-columns: 1fr; }
 }
+
+/* ---------- Seasonal themes (generated) ---------- */
+[data-theme="Halloween"] { --bg:#17121F; --card:#221A2E; --ink:#F3EDE2; --muted:#B9AEC9; --line:#3A2E4D; --chip:#2C223B; --accent:#F97316; --accent-ink:#17121F; --accent-soft:#3D2A1E; --warn-bg:#3A2410; --warn:#FDBA74; --shadow:0 1px 2px rgba(0,0,0,.3), 0 6px 20px rgba(0,0,0,.25); }
+[data-theme="Thanksgiving"] { --bg:#F5EBDD; --card:#FFFAF2; --ink:#2B1D12; --muted:#6B5443; --line:#E5D3BE; --chip:#F2E4D1; --accent:#B45309; --accent-ink:#FFFFFF; --accent-soft:#F6DDBF; --warn-bg:#FFF7ED; --warn:#9A3412; --shadow:0 1px 2px rgba(15,23,42,.06), 0 6px 20px rgba(15,23,42,.06); }
+[data-theme="Winter"] { --bg:#E8F1F8; --card:#FFFFFF; --ink:#0F2233; --muted:#4A6275; --line:#D2E1EC; --chip:#E4EEF6; --accent:#0E7490; --accent-ink:#FFFFFF; --accent-soft:#CCEAF1; --warn-bg:#FFF7ED; --warn:#9A3412; --shadow:0 1px 2px rgba(15,23,42,.06), 0 6px 20px rgba(15,23,42,.06); }
+[data-theme="Valentine's"] { --bg:#FCEFF2; --card:#FFFFFF; --ink:#3A1220; --muted:#7A4B5A; --line:#F2D3DC; --chip:#FBE4EA; --accent:#BE123C; --accent-ink:#FFFFFF; --accent-soft:#FAD4DE; --warn-bg:#FFF7ED; --warn:#9A3412; --shadow:0 1px 2px rgba(15,23,42,.06), 0 6px 20px rgba(15,23,42,.06); }
+[data-theme="St. Patrick's"] { --bg:#EAF5EC; --card:#FFFFFF; --ink:#0F2A17; --muted:#476353; --line:#CFE6D5; --chip:#E1F0E5; --accent:#15803D; --accent-ink:#FFFFFF; --accent-soft:#CDEBD6; --warn-bg:#FFF7ED; --warn:#9A3412; --shadow:0 1px 2px rgba(15,23,42,.06), 0 6px 20px rgba(15,23,42,.06); }
+[data-theme="Easter"] { --bg:#F7F3FB; --card:#FFFFFF; --ink:#2A2140; --muted:#66597F; --line:#E6DDF2; --chip:#F1EAF8; --accent:#7C3AED; --accent-ink:#FFFFFF; --accent-soft:#E5D9FB; --warn-bg:#FFF7ED; --warn:#9A3412; --shadow:0 1px 2px rgba(15,23,42,.06), 0 6px 20px rgba(15,23,42,.06); }
+[data-theme="Summer"] { --bg:#FFF8E7; --card:#FFFFFF; --ink:#1F2A33; --muted:#5B6770; --line:#F1E3BF; --chip:#FDF0CF; --accent:#0284C7; --accent-ink:#FFFFFF; --accent-soft:#D3ECF8; --warn-bg:#FFF7ED; --warn:#9A3412; --shadow:0 1px 2px rgba(15,23,42,.06), 0 6px 20px rgba(15,23,42,.06); }
+[data-theme="Back to School"] { --bg:#F4F1E8; --card:#FFFFFF; --ink:#1E1E1E; --muted:#5A5650; --line:#E3DDCC; --chip:#EEE8D8; --accent:#2F5D50; --accent-ink:#FFFFFF; --accent-soft:#D5E5DF; --warn-bg:#FFF7ED; --warn:#9A3412; --shadow:0 1px 2px rgba(15,23,42,.06), 0 6px 20px rgba(15,23,42,.06); }
+[data-theme="Hockey Playoffs"] { --bg:#F2F5F9; --card:#FFFFFF; --ink:#0B1220; --muted:#475569; --line:#D6DEE8; --chip:#E9EEF5; --accent:#C8102E; --accent-ink:#FFFFFF; --accent-soft:#F7D5DA; --warn-bg:#FFF7ED; --warn:#9A3412; --shadow:0 1px 2px rgba(15,23,42,.06), 0 6px 20px rgba(15,23,42,.06); }
+[data-theme="Halloween"] { --deco:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2248%22%20height%3D%2224%22%20viewBox%3D%220%200%2048%2024%22%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2214%22%20r%3D%227%22%20fill%3D%22%23F97316%22%2F%3E%3Cpath%20d%3D%22M12%207v-3%22%20stroke%3D%22%2322C55E%22%20stroke-width%3D%222%22%2F%3E%3Cpath%20d%3D%22M30%2010q4-4%206%200q2-4%206%200q-3%200-6%204q-3-4-6-4z%22%20fill%3D%22%23A78BFA%22%2F%3E%3C%2Fsvg%3E"); }
+[data-theme="Thanksgiving"] { --deco:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2248%22%20height%3D%2224%22%20viewBox%3D%220%200%2048%2024%22%3E%3Cpath%20d%3D%22M12%203l2%205%205-1-3%204%204%203-5%201%201%205-4-3-4%203%201-5-5-1%204-3-3-4%205%201z%22%20fill%3D%22%23C2410C%22%2F%3E%3Ccircle%20cx%3D%2236%22%20cy%3D%2212%22%20r%3D%224%22%20fill%3D%22%23CA8A04%22%2F%3E%3C%2Fsvg%3E"); }
+[data-theme="Winter"] { --deco:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2248%22%20height%3D%2224%22%20viewBox%3D%220%200%2048%2024%22%3E%3Cg%20stroke%3D%22%2338BDF8%22%20stroke-width%3D%221.6%22%20stroke-linecap%3D%22round%22%3E%3Cpath%20d%3D%22M12%204v16M5%208l14%208M5%2016l14-8%22%2F%3E%3Cpath%20d%3D%22M36%208v8M32%2010l8%204M32%2014l8-4%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E"); }
+[data-theme="Christmas"] { --deco:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2248%22%20height%3D%2224%22%20viewBox%3D%220%200%2048%2024%22%3E%3Cpath%20d%3D%22M12%203l7%2013H5z%22%20fill%3D%22%23166534%22%2F%3E%3Crect%20x%3D%2211%22%20y%3D%2216%22%20width%3D%222%22%20height%3D%224%22%20fill%3D%22%237C2D12%22%2F%3E%3Ccircle%20cx%3D%2236%22%20cy%3D%2212%22%20r%3D%224%22%20fill%3D%22%23B91C1C%22%2F%3E%3C%2Fsvg%3E"); }
+[data-theme="Valentine's"] { --deco:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2248%22%20height%3D%2224%22%20viewBox%3D%220%200%2048%2024%22%3E%3Cpath%20d%3D%22M12%2019s-7-4.5-7-9a3.5%203.5%200%200%201%207-1%203.5%203.5%200%200%201%207%201c0%204.5-7%209-7%209z%22%20fill%3D%22%23E11D48%22%2F%3E%3Cpath%20d%3D%22M36%2015s-4-2.6-4-5.2a2%202%200%200%201%204-.6%202%202%200%200%201%204%20.6c0%202.6-4%205.2-4%205.2z%22%20fill%3D%22%23F9A8D4%22%2F%3E%3C%2Fsvg%3E"); }
+[data-theme="St. Patrick's"] { --deco:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2248%22%20height%3D%2224%22%20viewBox%3D%220%200%2048%2024%22%3E%3Cg%20fill%3D%22%2316A34A%22%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%228%22%20r%3D%223.6%22%2F%3E%3Ccircle%20cx%3D%228%22%20cy%3D%2213%22%20r%3D%223.6%22%2F%3E%3Ccircle%20cx%3D%2216%22%20cy%3D%2213%22%20r%3D%223.6%22%2F%3E%3C%2Fg%3E%3Cpath%20d%3D%22M12%2014l2%207%22%20stroke%3D%22%2316A34A%22%20stroke-width%3D%221.6%22%2F%3E%3Ccircle%20cx%3D%2236%22%20cy%3D%2212%22%20r%3D%223%22%20fill%3D%22%23FACC15%22%2F%3E%3C%2Fsvg%3E"); }
+[data-theme="Easter"] { --deco:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2248%22%20height%3D%2224%22%20viewBox%3D%220%200%2048%2024%22%3E%3Cellipse%20cx%3D%2212%22%20cy%3D%2212%22%20rx%3D%225.5%22%20ry%3D%227.5%22%20fill%3D%22%23C4B5FD%22%2F%3E%3Cpath%20d%3D%22M7%2012h10%22%20stroke%3D%22%23fff%22%20stroke-width%3D%221.5%22%2F%3E%3Cellipse%20cx%3D%2236%22%20cy%3D%2212%22%20rx%3D%225%22%20ry%3D%227%22%20fill%3D%22%23FDE68A%22%2F%3E%3C%2Fsvg%3E"); }
+[data-theme="Summer"] { --deco:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2248%22%20height%3D%2224%22%20viewBox%3D%220%200%2048%2024%22%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2211%22%20r%3D%225%22%20fill%3D%22%23FBBF24%22%2F%3E%3Cpath%20d%3D%22M28%2016q3-3%206%200t6%200t6%200%22%20stroke%3D%22%2338BDF8%22%20stroke-width%3D%222%22%20fill%3D%22none%22%2F%3E%3C%2Fsvg%3E"); }
+[data-theme="Back to School"] { --deco:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2248%22%20height%3D%2224%22%20viewBox%3D%220%200%2048%2024%22%3E%3Cg%20transform%3D%22rotate%28-30%2012%2012%29%22%3E%3Crect%20x%3D%224%22%20y%3D%229%22%20width%3D%2213%22%20height%3D%226%22%20fill%3D%22%23FACC15%22%2F%3E%3Cpath%20d%3D%22M17%209l5%203-5%203z%22%20fill%3D%22%23F5D0A9%22%2F%3E%3Crect%20x%3D%222%22%20y%3D%229%22%20width%3D%222%22%20height%3D%226%22%20fill%3D%22%23F472B6%22%2F%3E%3C%2Fg%3E%3Ccircle%20cx%3D%2236%22%20cy%3D%2213%22%20r%3D%225%22%20fill%3D%22%23DC2626%22%2F%3E%3Cpath%20d%3D%22M36%208v-3%22%20stroke%3D%22%23166534%22%20stroke-width%3D%221.6%22%2F%3E%3C%2Fsvg%3E"); }
+[data-theme="Hockey Playoffs"] { --deco:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2248%22%20height%3D%2224%22%20viewBox%3D%220%200%2048%2024%22%3E%3Cellipse%20cx%3D%2212%22%20cy%3D%2213%22%20rx%3D%226%22%20ry%3D%223%22%20fill%3D%22%230B1220%22%2F%3E%3Crect%20x%3D%226%22%20y%3D%2210%22%20width%3D%2212%22%20height%3D%223%22%20fill%3D%22%230B1220%22%2F%3E%3Cpath%20d%3D%22M28%204l10%2014h6%22%20stroke%3D%22%231D4ED8%22%20stroke-width%3D%222.4%22%20fill%3D%22none%22%20stroke-linecap%3D%22round%22%2F%3E%3C%2Fsvg%3E"); }
+.deco-band { height: 14px; background-image: var(--deco, none); background-repeat: repeat-x; background-size: auto 100%; opacity: .9; }
+.app .deco-band { margin: 0 18px; border-radius: 4px; }
+.wallpage .deco-band { height: 1.5vw; margin: -.6vw 0 0; }
+
+/* Photos and Instacart */
+.btn.instacart { background: #0AAD0A; color: #fff; }
+.btn.danger-fill { background: #B91C1C; color: #fff; }
+.photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 6px; }
+.ph { position: relative; aspect-ratio: 1; border: 0; padding: 0; border-radius: 10px; overflow: hidden; background: var(--chip); }
+.ph img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .15s; }
+.ph.on img { transform: scale(.86); border-radius: 8px; }
+.ph-check { position: absolute; top: 6px; right: 6px; width: 22px; height: 22px; border-radius: 50%; border: 2px solid #fff; background: rgba(0,0,0,.25); color: transparent; display: grid; place-items: center; }
+.ph-check .ic { width: 14px; height: 14px; }
+.ph.on .ph-check { background: var(--accent); color: var(--accent-ink); }
+.ph-blank { display: block; width: 100%; height: 100%; }
+.progress { display: flex; flex-direction: column; gap: 6px; }
+.bar-track { height: 8px; border-radius: 4px; background: var(--chip); overflow: hidden; }
+.bar-fill { height: 100%; background: var(--accent); transition: width .3s; }
+.daily-wall { display: flex; flex-direction: column; gap: .7em; }
+.daily-wall .daily-text { font-size: 1em; }
+.photo-card { padding: 0; height: 15vw; min-height: 9em; flex-shrink: 0; }
+.ptile { width: 100%; height: 100%; display: grid; place-items: center; background: var(--chip); }
+.ptile img { width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 1.2s; }
+.ptile img.on { opacity: 1; }
+.ptile .empty { padding: 1em; text-align: center; }
+#show { position: fixed; inset: 0; background: #000; z-index: 40; opacity: 0; pointer-events: none; transition: opacity 1.5s; }
+body.slideshow #show { opacity: 1; }
+#show img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; opacity: 0; transition: opacity 1.5s; }
+#show img.on { opacity: 1; }
+.show-clock { position: absolute; left: 2.4vw; bottom: 2vw; color: #fff; text-shadow: 0 2px 12px rgba(0,0,0,.7); }
+.sc-time { font-family: 'Space Grotesk', sans-serif; font-size: 3.4em; font-weight: 700; line-height: 1; }
+.sc-date { font-size: 1.3em; margin-top: .2em; }
+.toggle.on .row-value { color: inherit; }
+.btn.instacart { align-self: stretch; }
+.wall .card.photo-card { padding: 0; }
+.wall .week .day { padding: .45em 0; }
+.daily-wall { flex-direction: row; gap: 2.4vw; align-items: flex-start; flex-shrink: 0; }
+.daily-wall .daily-part { flex: 1; min-width: 0; }
+.daily-wall .daily-text { font-size: .95em; margin: .15em 0 0; }
+.daily-wall .credit { margin-top: .2em; }
+/* Wall sizing tuned so a busy week, the photo and the joke strip fit a 16:9 screen */
+body.wallpage { font-size: 1.04vw; }
+.wall { padding: 1.4vw 2vw 1.6vw; gap: 1.1vw; }
+.w-cols, .wall .col { gap: 1.1vw; }
+.w-date { font-size: 2.3em; }
+.wallpage .deco-band { height: 1.1vw; margin: 0; }
+.wall .photo-card { height: 11vw; min-height: 0; }
+.wall .card { padding: .9em 1.2em; }
+.wall .card h2 { font-size: 1.25em; margin-bottom: .3em; }
+.wall .week .day { padding: .35em 0; }
+.wall .week .day-num { font-size: 1.35em; }
+.wall .nu { padding: .55em 0; }

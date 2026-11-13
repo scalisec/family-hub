@@ -1,7 +1,7 @@
 // Family Hub offline helper: keeps the app's own files so it opens instantly, even with no signal.
 // It serves the saved copy straight away and fetches a fresh one in the background for next time.
 // It never touches Google, the helper, or the weather: those always go to the network.
-const CACHE = 'fh-shell-3.0.1';
+const CACHE = 'fh-shell-3.1.0';
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((c) => c.addAll(['./', 'index.html', 'css/app.css', 'js/app.js'])).catch(() => {}));

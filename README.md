@@ -28,3 +28,8 @@ There are no personal details in this repo. Names, emails, calendars and the hom
 3. **Wall:** in the app, go to **More > Wall screen > Open** and open that link on the wall screen in full screen.
 
 The old version's tabs in the sheet (People, Events, Meals and so on) aren't used any more. Delete them once you're happy with version 3. The helper keeps its own data in a hidden **Store** tab.
+
+## Version 3.1 extras
+
+- **Photos:** the helper keeps wall photos in its own **Family Hub Photos** folder in your Drive (it can only see files it made). After updating to 3.1, run **authorize** in Apps Script once more so it's allowed to create that folder.
+- **Instacart (optional):** sign up for the Instacart Developer Platform and create an API key. In Apps Script, open **Project Settings > Script properties** and add `INSTACART_API_KEY` with the key. While testing with a development key, also add `INSTACART_BASE` with the development address Instacart gives you. Without a key, **Shop on Instacart** copies the list and opens Instacart's search.

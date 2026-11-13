@@ -15,7 +15,7 @@
   <link rel="stylesheet" href="css/app.css">
   <script>
     // Paint the saved theme before anything loads, so there's no flash.
-    try { var d = JSON.parse(localStorage.getItem('fh.data') || 'null'); var t = d && d.settings && d.settings.theme && d.settings.theme.value; if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+    try { var t = localStorage.getItem('fh.themeNow'); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
   </script>
   <script type="module" src="js/app.js"></script>
 </head>

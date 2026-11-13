@@ -12,7 +12,7 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap">
   <link rel="stylesheet" href="css/app.css">
   <script>
-    try { var w = JSON.parse(localStorage.getItem('fh.wall') || 'null'); if (w && w.snapshot && w.snapshot.theme) document.documentElement.dataset.theme = w.snapshot.theme; } catch (e) {}
+    try { var t = localStorage.getItem('fh.wallTheme'); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
   </script>
   <script type="module" src="js/wall.js"></script>
 </head>

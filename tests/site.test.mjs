@@ -28,7 +28,8 @@ test('pages load their scripts and styles', () => {
 
 test('only talks to the services we expect', () => {
   const allowed = ['accounts.google.com', 'www.googleapis.com', 'oauth2.googleapis.com', 'script.google.com', 'api.open-meteo.com',
-    'geocoding-api.open-meteo.com', 'fonts.googleapis.com', 'fonts.gstatic.com', 'drive.google.com', 'zenquotes.io', 'icanhazdadjoke.com'];
+    'geocoding-api.open-meteo.com', 'fonts.googleapis.com', 'fonts.gstatic.com', 'drive.google.com', 'zenquotes.io', 'icanhazdadjoke.com',
+    'connect.instacart.com', 'www.instacart.ca', 'scalisec.github.io'];
   for (const f of [...jsFiles, 'index.html', 'wall.html', 'sw.js', 'apps-script/Relay.gs']) {
     for (const m of read(f).matchAll(/https:\/\/([a-z0-9.-]+)/gi)) {
       assert.ok(allowed.includes(m[1]), `${f} mentions ${m[1]}`);

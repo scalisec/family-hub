@@ -32,3 +32,11 @@ export async function wallFeed(key) {
   if (!res.ok) throw new Error(`Feed returned ${res.status}`);
   return res.json();
 }
+
+export async function wallPhoto(key, id) {
+  const res = await fetch(`${RELAY_URL}?key=${encodeURIComponent(key)}&photo=${encodeURIComponent(id)}`);
+  if (!res.ok) throw new Error(`Photo returned ${res.status}`);
+  const body = await res.json();
+  if (!body.ok) throw new Error(body.error || 'No photo');
+  return body.photo;
+}

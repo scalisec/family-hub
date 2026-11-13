@@ -31,10 +31,12 @@ const EVENT_COLORS = {
 /** Wall feed: read-only, needs the secret key. */
 function doGet(e) {
   const key = String((e && e.parameter && e.parameter.key) || '');
+  const photo = String((e && e.parameter && e.parameter.photo) || '');
   const wallKey = props_().getProperty('WALL_KEY');
   if (!wallKey || !key || key !== wallKey) return json_({ ok: false, error: 'This wall link has been replaced. Open More > Wall in the app for the new one.' });
   try {
-    return json_({ ok: true, wall: true, snapshot: load_('snapshot') || {}, feed: feedOrSync_(), daily: daily_() });
+    if (photo) return json_({ ok: true, photo: photoData_(photo) });
+    return json_({ ok: true, wall: true, snapshot: load_('snapshot') || {}, feed: feedOrSync_(), daily: daily_(), photos: photoIds_() });
   } catch (err) {
     return json_({ ok: false, error: String(err.message || err) });
   }
@@ -55,6 +57,10 @@ function doPost(e) {
       case 'sync': return json_({ ok: true, feed: syncCalendars(), daily: daily_() });
       case 'rotateKey': return json_({ ok: true, wallKey: newWallKey_() });
       case 'import': return json_({ ok: true, old: importV2_() });
+      case 'instacart': return json_({ ok: true, url: instacart_(data.items || [], data.title || '') });
+      case 'photoAdd': return json_({ ok: true, photo: photoAdd_(data) });
+      case 'photoList': return json_({ ok: true, photos: load_('photos') || [], thumbs: thumbs_() });
+      case 'photoDelete': return json_({ ok: true, deleted: photoDelete_(data.ids || []) });
       default: return json_({ ok: false, error: 'Unknown action.' });
     }
   } catch (err) {
@@ -137,6 +143,8 @@ function cleanSnapshot_(s) {
   out.place = s.place && isFinite(Number(s.place.lat)) && isFinite(Number(s.place.lon))
     ? { name: String(s.place.name || '').slice(0, 80), lat: Number(s.place.lat), lon: Number(s.place.lon) } : null;
   out.theme = String(s.theme || 'Rink').slice(0, 30);
+  out.themeBase = String(s.themeBase || 'Rink').slice(0, 30);
+  out.photos = s.photos && typeof s.photos === 'object' ? s.photos : {};
   out.layout = s.layout && typeof s.layout === 'object' ? s.layout : {};
   out.dim = s.dim && typeof s.dim === 'object' ? { from: String(s.dim.from || '22:00'), to: String(s.dim.to || '06:00') } : { from: '22:00', to: '06:00' };
   out.published = Date.now();
@@ -293,6 +301,153 @@ function fetchQuote_() {
   return { q: String(j[0].q).slice(0, 300), a: String(j[0].a || '').slice(0, 80) };
 }
 
+/* ---------- Instacart ---------- */
+
+/**
+ * Makes an Instacart shopping list page from the grocery list and returns its link.
+ * Needs an Instacart Developer Platform key saved as the INSTACART_API_KEY script property
+ * (Apps Script > Project Settings > Script properties). Without one, returns '' and the app
+ * falls back to copying the list. INSTACART_BASE can point at the development server while testing.
+ */
+function instacart_(items, title) {
+  const p = props_();
+  const key = p.getProperty('INSTACART_API_KEY');
+  if (!key) return '';
+  const base = p.getProperty('INSTACART_BASE') || 'https://connect.instacart.com';
+  const lines = items.map(function (t) { return String(t || '').trim().slice(0, 100); }).filter(String).slice(0, 100);
+  if (!lines.length) return '';
+  const res = UrlFetchApp.fetch(base + '/idp/v1/products/products_link', {
+    method: 'post',
+    contentType: 'application/json',
+    muteHttpExceptions: true,
+    headers: { Authorization: 'Bearer ' + key, Accept: 'application/json' },
+    payload: JSON.stringify({
+      title: String(title || 'Family Hub groceries').slice(0, 80),
+      link_type: 'shopping_list',
+      expires_in: 7,
+      line_items: lines.map(function (t) { return { name: t, display_text: t }; }),
+      landing_page_configuration: { partner_linkback_url: 'https://scalisec.github.io/family-hub/' }
+    })
+  });
+  if (res.getResponseCode() !== 200) throw new Error('Instacart said ' + res.getResponseCode() + '. Check the Instacart key.');
+  return String(JSON.parse(res.getContentText()).products_link_url || '');
+}
+
+/* ---------- Wall photos (kept in the helper's own "Family Hub Photos" folder) ---------- */
+
+const DRIVE = 'https://www.googleapis.com/drive/v3';
+const MAX_PHOTOS = 400;
+
+function driveFetch_(url, opts) {
+  const o = opts || {};
+  o.muteHttpExceptions = true;
+  o.headers = Object.assign({ Authorization: 'Bearer ' + ScriptApp.getOAuthToken() }, o.headers || {});
+  const res = UrlFetchApp.fetch(url, o);
+  const code = res.getResponseCode();
+  if (code >= 300) throw new Error('Drive said ' + code + (code === 403 ? ': run "authorize" once in Apps Script to allow photos.' : '.'));
+  return res;
+}
+
+function photoFolder_() {
+  const p = props_();
+  let id = p.getProperty('PHOTO_FOLDER');
+  if (id) {
+    try {
+      const f = JSON.parse(driveFetch_(DRIVE + '/files/' + id + '?fields=id,trashed').getContentText());
+      if (!f.trashed) return id;
+    } catch (err) { /* make a new one */ }
+  }
+  const made = JSON.parse(driveFetch_(DRIVE + '/files?fields=id', {
+    method: 'post', contentType: 'application/json',
+    payload: JSON.stringify({ name: 'Family Hub Photos', mimeType: 'application/vnd.google-apps.folder' })
+  }).getContentText());
+  p.setProperty('PHOTO_FOLDER', made.id);
+  return made.id;
+}
+
+/** data: { name, key, data (base64 JPEG, about 1920 px), thumb (base64 JPEG, about 240 px), w, h } */
+function photoAdd_(data) {
+  const list = load_('photos') || [];
+  const key = String(data.key || '').slice(0, 200);
+  const dupe = key && list.find(function (x) { return x.key === key; });
+  if (dupe) return dupe;
+  if (list.length >= MAX_PHOTOS) throw new Error('The wall holds up to ' + MAX_PHOTOS + ' photos. Remove some first.');
+  const b64 = String(data.data || '');
+  if (!b64 || b64.length > 4000000) throw new Error('That photo is too big.');
+  const bytes = Utilities.base64Decode(b64);
+  const folder = photoFolder_();
+  const up = JSON.parse(driveFetch_('https://www.googleapis.com/upload/drive/v3/files?uploadType=media&fields=id', {
+    method: 'post', contentType: 'image/jpeg', payload: bytes
+  }).getContentText());
+  driveFetch_(DRIVE + '/files/' + up.id + '?addParents=' + folder + '&removeParents=root&fields=id', {
+    method: 'patch', contentType: 'application/json',
+    payload: JSON.stringify({ name: String(data.name || 'photo').slice(0, 120).replace(/\.[a-z0-9]+$/i, '') + '.jpg' })
+  });
+  const rec = { id: up.id, key: key, name: String(data.name || '').slice(0, 120), w: Number(data.w) || 0, h: Number(data.h) || 0, added: Date.now() };
+  // The app sends photos one at a time, so a simple read-then-save is safe here.
+  {
+    const fresh = load_('photos') || [];
+    fresh.push(rec);
+    save_('photos', fresh);
+    if (data.thumb && String(data.thumb).length < 45000) {
+      const sh = thumbSheet_();
+      sh.getRange(sh.getLastRow() + 1, 1, 1, 2).setNumberFormat('@').setValues([[up.id, String(data.thumb)]]);
+    }
+  }
+  return rec;
+}
+
+function photoDelete_(ids) {
+  const gone = {};
+  ids.slice(0, 500).forEach(function (id) {
+    try { driveFetch_(DRIVE + '/files/' + encodeURIComponent(id), { method: 'patch', contentType: 'application/json', payload: JSON.stringify({ trashed: true }) }); } catch (err) { /* already gone */ }
+    gone[id] = true;
+  });
+  {
+    save_('photos', (load_('photos') || []).filter(function (p) { return !gone[p.id]; }));
+    const sh = thumbSheet_();
+    const last = sh.getLastRow();
+    if (last > 1) {
+      const keep = sh.getRange(2, 1, last - 1, 2).getValues().filter(function (r) { return r[0] && !gone[r[0]]; });
+      sh.getRange(2, 1, last - 1, 2).clearContent();
+      if (keep.length) sh.getRange(2, 1, keep.length, 2).setValues(keep);
+    }
+  }
+  return Object.keys(gone).length;
+}
+
+/** Small previews for the app's photo grid, one row each in a hidden "Thumbs" tab. */
+function thumbSheet_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sh = ss.getSheetByName('Thumbs');
+  if (!sh) {
+    sh = ss.insertSheet('Thumbs');
+    sh.getRange(1, 1, 1, 2).setValues([['photo', 'preview (written by Family Hub, do not edit)']]).setFontWeight('bold');
+    sh.getRange('A:B').setNumberFormat('@');
+    sh.hideSheet();
+  }
+  return sh;
+}
+
+function thumbs_() {
+  const sh = thumbSheet_();
+  const last = sh.getLastRow();
+  const out = {};
+  if (last > 1) sh.getRange(2, 1, last - 1, 2).getValues().forEach(function (r) { if (r[0]) out[r[0]] = r[1]; });
+  return out;
+}
+
+function photoIds_() {
+  return (load_('photos') || []).map(function (p) { return p.id; });
+}
+
+/** For the wall: one photo as base64, only if it's one of the wall's photos. */
+function photoData_(id) {
+  if (photoIds_().indexOf(id) < 0) throw new Error('No such photo.');
+  const res = driveFetch_(DRIVE + '/files/' + encodeURIComponent(id) + '?alt=media');
+  return Utilities.base64Encode(res.getBlob().getBytes());
+}
+
 /* ---------- Bring over the old version's setup (one time) ---------- */
 
 /** Reads the old tabs in the Family Hub Data sheet, if they're still there. Nothing is changed. */
@@ -346,11 +501,10 @@ function save_(key, value) {
   try {
     const sh = store_();
     const last = sh.getLastRow();
-    if (last > 1) {
-      const keys = sh.getRange(2, 1, last - 1, 1).getValues();
-      for (let r = keys.length - 1; r >= 0; r -= 1) if (keys[r][0] === key) sh.deleteRow(r + 2);
-    }
-    sh.getRange(sh.getLastRow() + 1, 1, parts.length, 2).setNumberFormat('@').setValues(parts);
+    const others = last > 1 ? sh.getRange(2, 1, last - 1, 2).getValues().filter(function (r) { return r[0] && r[0] !== key; }) : [];
+    const rows = others.concat(parts);
+    if (last > 1) sh.getRange(2, 1, last - 1, 2).clearContent();
+    sh.getRange(2, 1, rows.length, 2).setNumberFormat('@').setValues(rows);
     CacheService.getScriptCache().remove('store:' + key);
   } finally {
     lock.releaseLock();
@@ -393,6 +547,7 @@ function authorize() {
   UrlFetchApp.fetch('https://zenquotes.io/api/today', { muteHttpExceptions: true });
   Maps.newDirectionFinder();
   store_();
+  photoFolder_();
   Logger.log('Family Hub helper is ready for ' + owner_());
 }
 
