@@ -245,12 +245,14 @@ function nextUp_(events, snap) {
 
 function driveMinutes_(origin, dest) {
   const cache = CacheService.getScriptCache();
-  const key = 'drive:' + md5_(origin + '|' + dest);
+  const key = 'drive2:' + md5_(origin + '|' + dest);
   const hit = cache.get(key);
   if (hit) return hit === 'x' ? null : Number(hit);
   const d = Maps.newDirectionFinder().setOrigin(origin).setDestination(dest)
-    .setMode(Maps.DirectionFinder.Mode.DRIVING).getDirections();
-  const minutes = d && d.routes && d.routes.length ? Math.ceil(d.routes[0].legs[0].duration.value / 60) : null;
+    .setMode(Maps.DirectionFinder.Mode.DRIVING).setRegion('ca').getDirections();
+  let minutes = d && d.routes && d.routes.length ? Math.ceil(d.routes[0].legs[0].duration.value / 60) : null;
+  // A vague location ("Powerplay Hockey") can match a place hours away: treat over 3 hours as unknown.
+  if (minutes != null && minutes > 180) minutes = null;
   cache.put(key, minutes == null ? 'x' : String(minutes), 21600);
   return minutes;
 }

@@ -74,7 +74,7 @@ function mealsToday() {
     h('div', { class: 'meal' }, h('span', { class: 'muted small' }, 'Dinner'), h('div', { class: 'strong' }, dinner ? dinner.text : 'Not planned')),
     weekend ? null : ppl.filter((p) => p.role === 'kid').map((k) => {
       const m = meals.find((x) => x.slot === `lunch:${k.id}`);
-      return h('div', { class: 'meal' }, h('span', { class: 'muted small' }, tag(k.id), ` ${k.name}'s lunch`), h('div', { class: 'strong' }, m ? m.text : 'Not planned'));
+      return h('div', { class: 'meal' }, h('span', { class: 'muted small' }, tag(k.id), ` ${String(k.name).trim().split(/\s+/)[0]}'s lunch`), h('div', { class: 'strong' }, m ? m.text : 'Not planned'));
     }));
 }
 

@@ -34,6 +34,7 @@ function tag(personId) {
   return h('span', { class: 'ptag', style: { borderColor: p.color, color: p.color }, title: p.name }, store.initial(p, peopleList()));
 }
 function whoName(id) { const p = person(id); return p ? p.name : 'Family'; }
+const first = (p) => String((p && p.name) || '').trim().split(/\s+/)[0];
 function empty(text, action) { return h('div', { class: 'empty' }, h('p', null, text), action || null); }
 function card(title, body, extra) {
   return h('section', { class: 'card' }, title ? h('div', { class: 'card-head' }, h('h3', null, title), extra || null) : null, body);
@@ -119,7 +120,7 @@ function render({ animate = false } = {}) {
   const root = $('#app');
   const main = h('main', { id: 'main', class: animate ? 'enter' : '' }, screen());
   const banner = !isConnected() && !ui.connecting ? connectBanner() : null;
-  root.replaceChildren(header(), banner, main, fab(), tabbar());
+  root.replaceChildren(...[header(), banner, main, fab(), tabbar()].filter(Boolean));
   const y = ui.scroll[ui.tab] || 0;
   if (y) main.scrollTop = y;
   ui.stale = false;
@@ -332,7 +333,7 @@ function todayEventsCard() {
 
 function mealSlots(day) {
   const slots = [['dinner', 'Dinner']];
-  if (!dates.isWeekend(day)) for (const k of store.kids(D())) slots.push([`lunch:${k.id}`, `${k.name}'s lunch`, k]);
+  if (!dates.isWeekend(day)) for (const k of store.kids(D())) slots.push([`lunch:${k.id}`, `${first(k)}'s lunch`, k]);
   return slots;
 }
 

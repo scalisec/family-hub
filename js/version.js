@@ -1,8 +1,9 @@
 // The app's version and release history (newest first). Keep VERSION, package.json and
 // version.json in step: the tests check they match.
-export const VERSION = '3.0.0';
+export const VERSION = '3.0.1';
 
 export const RELEASES = [
+  { version: '3.0.1', date: '2026-11-12', notes: ['Fixed a stray "null" under the title.', 'Lunch labels use first names.', 'Leave-by times ignore a drive over 3 hours (a vague location that matched the wrong place).'] },
   { version: '3.0.0', date: '2026-11-12', notes: [
     'Rebuilt as a real app: opens instantly, every tap answers straight away, and changes save in the background.',
     'Your data lives in one file in a Family Hub folder in your Google Drive.',

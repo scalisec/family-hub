@@ -1,6 +1,6 @@
 {
   "name": "family-hub",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "private": true,
   "type": "module",
   "description": "Family Hub: family wall calendar and organizer (GitHub Pages + Google Drive).",
