@@ -22,8 +22,8 @@ export const SWATCHES = {
   Summer: ['#FFF8E7', '#FFFFFF', '#0284C7'],
   'Back to School': ['#F4F1E8', '#FFFFFF', '#2F5D50'],
   'Hockey Playoffs': ['#F2F5F9', '#FFFFFF', '#C8102E'],
-  Barracudas: ['#0B2545', '#12345E', '#F26B1D'],
-  Bulldogs: ['#EEF2F8', '#FFFFFF', '#1E3A8A'],
+  Barracudas: ['#111A2C', '#1A2640', '#E8553A'],
+  Bulldogs: ['#E4F0FA', '#001848', '#C8102E'],
 };
 
 // Easter Sunday (Gregorian), as [month 0-11, day].
