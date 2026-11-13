@@ -391,3 +391,6 @@ body.wallpage { font-size: 1.04vw; }
 .w-left { display: flex; align-items: center; gap: 1.2em; }
 .w-logo { height: 5.2em; width: auto; max-width: 9em; object-fit: contain; }
 [data-theme="Bulldogs"] .leave.soon { color: #B8102E; }
+.install-row { display: flex; align-items: center; gap: 12px; }
+.install-icon { width: 44px; height: 44px; border-radius: 11px; flex-shrink: 0; }
+.install-how { margin: 10px 0 0; }

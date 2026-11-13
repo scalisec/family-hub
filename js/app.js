@@ -9,6 +9,7 @@ import { connect, disconnect, isConnected, wasConnected, accountEmail, setAccoun
 import { folderLink } from './drive.js';
 import { wallLink, relay } from './relay.js';
 import { prepare, isImage } from './photos.js';
+import { platform, canPrompt, promptInstall, onInstallChange } from './install.js';
 import * as sync from './sync.js';
 import { VERSION, RELEASES, latestVersion, compareVersions, releaseDate } from './version.js';
 import { BASE_THEMES, SEASONAL_THEMES, TEAM_THEMES, SWATCHES, AUTO, seasonFor, seasonCalendar, gameDayTheme } from './themes.js';
@@ -690,9 +691,33 @@ function moreScreen() {
       h('h2', { class: 'page-title' }, title),
       morePage(ui.more));
   }
-  return h('div', { class: 'screen' }, card(null, h('div', { class: 'list' }, MORE.map(([key, label, ic]) => row({ onclick: () => openMore(key) },
+  return h('div', { class: 'screen' }, installCard(), card(null, h('div', { class: 'list' }, MORE.map(([key, label, ic]) => row({ onclick: () => openMore(key) },
     h('span', { class: 'menu-ic' }, icon(ic)), h('div', { class: 'row-value' }, label), icon('chevron', 'tail'))))),
   h('p', { class: 'muted small center' }, `Family Hub ${VERSION}`));
+}
+
+function installCard() {
+  const p = platform();
+  if (p.standalone) return null;
+  let how = null;
+  if (!canPrompt()) {
+    how = p.iOS ? 'In Safari, tap Share, then Add to Home Screen.'
+      : p.samsung ? 'Tap the menu (three lines), then Add page to, then Home screen.'
+        : p.android ? 'Tap Chrome\'s menu (three dots), then Add to Home screen or Install app.'
+          : 'In Chrome or Edge, click the install icon at the right end of the address bar, or the menu, then Install Family Hub.';
+  }
+  return h('section', { class: 'card install' },
+    h('div', { class: 'install-row' },
+      h('img', { class: 'install-icon', src: 'icons/icon-192.png', alt: '' }),
+      h('div', { class: 'row-value' }, 'Install Family Hub', h('div', { class: 'muted small' }, p.installedBefore && !canPrompt()
+        ? 'Already installed? Open it from your home screen or app list.'
+        : 'Opens full screen from your home screen, like a regular app.')),
+      canPrompt() ? h('button', { class: 'btn small', onclick: async () => {
+        const r = await promptInstall();
+        toast(r === 'accepted' ? 'Installing Family Hub' : 'Not installed');
+        render();
+      } }, 'Install') : null),
+    how ? h('p', { class: 'muted small install-how' }, how) : null);
 }
 
 function morePage(page) {
@@ -1087,6 +1112,7 @@ function accountPage() {
 function aboutPage() {
   const status = h('span', { class: 'muted small' });
   return h('div', { class: 'stack' },
+    installCard(),
     card(`Version ${VERSION}`, h('div', { class: 'btn-row' },
       h('button', { class: 'btn ghost', onclick: async () => {
         status.textContent = 'Checking...';
@@ -1122,6 +1148,7 @@ function startApp() {
   render();
   sync.subscribe((what) => { if (what === 'status') { const top = $('header.top'); if (top) top.replaceWith(header()); return; } refresh(); });
   onGoogle(() => refresh());
+  onInstallChange(() => { if (ui.tab === 'more') refresh(); });
   document.addEventListener('focusout', () => setTimeout(() => { if (ui.stale && !document.querySelector('.sheet-wrap')) refresh(); }, 50));
   new MutationObserver(() => { if (ui.stale && !document.querySelector('.sheet-wrap')) refresh(); }).observe(document.body, { childList: true });
   sync.start();
