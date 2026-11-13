@@ -155,6 +155,7 @@ export function snapshot(data, now = Date.now()) {
     theme: setting(data, 'theme', 'Rink'),
     themeBase: setting(data, 'themeBase', 'Rink'),
     teamThemes: setting(data, 'teamThemes', null),
+    teamLogos: setting(data, 'teamLogos', {}),
     photos: photoSettings(data),
     layout: layout(data),
     dim: setting(data, 'dim', { from: '22:00', to: '06:00' }),

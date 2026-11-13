@@ -145,6 +145,13 @@ function cleanSnapshot_(s) {
   out.theme = String(s.theme || 'Rink').slice(0, 30);
   out.themeBase = String(s.themeBase || 'Rink').slice(0, 30);
   out.teamThemes = s.teamThemes && typeof s.teamThemes === 'object' ? s.teamThemes : null;
+  out.teamLogos = {};
+  if (s.teamLogos && typeof s.teamLogos === 'object') {
+    Object.keys(s.teamLogos).slice(0, 6).forEach(function (k) {
+      const v = String(s.teamLogos[k] || '');
+      if (/^data:image\/(png|jpeg|webp);base64,/.test(v) && v.length < 200000) out.teamLogos[String(k).slice(0, 30)] = v;
+    });
+  }
   out.photos = s.photos && typeof s.photos === 'object' ? s.photos : {};
   out.layout = s.layout && typeof s.layout === 'object' ? s.layout : {};
   out.dim = s.dim && typeof s.dim === 'object' ? { from: String(s.dim.from || '22:00'), to: String(s.dim.to || '06:00') } : { from: '22:00', to: '06:00' };

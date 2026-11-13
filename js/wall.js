@@ -36,6 +36,12 @@ function eventsOn(day) {
   return ((feed && feed.feed && feed.feed.events) || []).filter((e) => e.start < b && e.end > a);
 }
 
+function logoFor(e) {
+  const t = snap().teamThemes;
+  const team = t && (t.list || []).find((x) => x.calendarId === e.cal);
+  return team ? (snap().teamLogos || {})[team.theme] || '' : '';
+}
+
 function nextUp() {
   const now = Date.now();
   const list = ((feed && feed.feed && feed.feed.nextUp) || []).filter((e) => e.start > now).slice(0, 2);
@@ -43,7 +49,7 @@ function nextUp() {
   return list.map((e) => h('div', { class: 'nu' },
     h('span', { class: 'bar', style: { background: e.color || 'var(--accent)' } }),
     h('div', { class: 'nu-main' },
-      h('div', { class: 'nu-title' }, e.title, ' ', tag(e.person)),
+      h('div', { class: 'nu-title' }, logoFor(e) ? h('img', { class: 'ev-logo', src: logoFor(e), alt: '' }) : null, e.title, ' ', tag(e.person)),
       h('div', { class: 'muted' }, `${dates.dayLabel(new Date(e.start))} ${dates.time(e.start)}`, e.location ? ` · ${e.location.split(',')[0]}` : ''),
       e.leave ? h('div', { class: `leave${e.leave - now < 45 * 60000 ? ' soon' : ''}` }, icon('car'), `Leave by ${dates.time(e.leave)}`, h('span', { class: 'muted' }, ` ${dates.inLabel(e.leave)}`))
         : e.arriveBy ? h('div', { class: 'leave' }, icon('clock'), `Be there by ${dates.time(e.arriveBy)}`) : null)));
@@ -226,8 +232,8 @@ function render() {
   root.replaceChildren(h('div', { class: 'wall' },
     deco ? h('div', { class: 'deco-band', 'aria-hidden': 'true' }) : null,
     h('header', { class: 'w-head' },
-      h('div', null, h('div', { class: 'w-date' }, now.toLocaleDateString('en-CA', { weekday: 'long', month: 'long', day: 'numeric' })),
-        h('div', { class: 'w-sub' }, h('span', { class: 'w-clock' }, dates.time(now.getTime())), problem ? h('span', { class: 'w-warn' }, ` · ${problem}`) : null)),
+      h('div', { class: 'w-left' }, (s.teamLogos || {})[theme] ? h('img', { class: 'w-logo', src: s.teamLogos[theme], alt: '' }) : null, h('div', null, h('div', { class: 'w-date' }, now.toLocaleDateString('en-CA', { weekday: 'long', month: 'long', day: 'numeric' })),
+        h('div', { class: 'w-sub' }, h('span', { class: 'w-clock' }, dates.time(now.getTime())), problem ? h('span', { class: 'w-warn' }, ` · ${problem}`) : null))),
       weather()),
     h('div', { class: 'w-cols' },
       h('div', { class: 'col' }, tile('nextUp', 'Next up', h('div', null, nextUp()), 'grow'), tile('meals', 'Meals today', mealsToday())),

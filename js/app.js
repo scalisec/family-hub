@@ -94,7 +94,7 @@ function statusSheet() {
 function header() {
   const title = ui.tab === 'today' ? 'Family Hub' : TABS.find(([k]) => k === ui.tab)[1];
   return h('header', { class: 'top' },
-    h('div', { class: 'top-title' }, ui.tab === 'today' ? h('span', { class: 'logo' }, icon('home')) : null, h('h1', null, title)),
+    h('div', { class: 'top-title' }, ui.tab === 'today' ? (teamLogo() ? h('img', { class: 'logo team', src: teamLogo(), alt: '' }) : h('span', { class: 'logo' }, icon('home'))) : null, h('h1', null, title)),
     statusChip());
 }
 
@@ -147,6 +147,30 @@ function screen() {
     case 'more': return moreScreen();
     default: return todayScreen();
   }
+}
+
+function teamLogo(theme = store.currentTheme(D(), new Date(), events())) {
+  return (store.setting(D(), 'teamLogos', {}) || {})[theme] || '';
+}
+
+// Logo for an event on a team's calendar (shown next to games in Next up).
+function eventLogo(e) {
+  const t = store.setting(D(), 'teamThemes', null);
+  const team = t && (t.list || []).find((x) => x.calendarId === e.cal);
+  return team ? (store.setting(D(), 'teamLogos', {}) || {})[team.theme] || '' : '';
+}
+
+// Shrinks a logo to 256 px and keeps transparent backgrounds.
+async function logoData(file) {
+  const bmp = await createImageBitmap(file);
+  const scale = Math.min(1, 256 / Math.max(bmp.width, bmp.height));
+  const c = document.createElement('canvas');
+  c.width = Math.round(bmp.width * scale);
+  c.height = Math.round(bmp.height * scale);
+  c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+  let url = c.toDataURL('image/png');
+  if (url.length > 150000) url = c.toDataURL('image/webp', 0.9);
+  return url;
 }
 
 function hasDeco() { const t = store.currentTheme(D(), new Date(), events()); return SEASONAL_THEMES.includes(t) || TEAM_THEMES.includes(t) || t === 'Christmas'; }
@@ -314,7 +338,7 @@ function nextUpCard() {
       return h('div', { class: 'nu' },
         h('span', { class: 'bar', style: { background: e.color || 'var(--accent)' } }),
         h('div', { class: 'nu-main' },
-          h('div', { class: 'nu-title' }, e.title, ' ', tag(e.person)),
+          h('div', { class: 'nu-title' }, eventLogo(e) ? h('img', { class: 'ev-logo', src: eventLogo(e), alt: '' }) : null, e.title, ' ', tag(e.person)),
           h('div', { class: 'muted small' }, `${dates.dayLabel(new Date(e.start))} ${dates.time(e.start)}`, e.location ? ` · ${e.location.split(',')[0]}` : ''),
           e.leave ? h('div', { class: `leave${leaveSoon ? ' soon' : ''}` }, icon('car'), `Leave by ${dates.time(e.leave)}`, h('span', { class: 'muted small' }, ` ${[dates.inLabel(e.leave), why].filter(Boolean).join(' \u00b7 ')}`))
             : e.arriveBy ? h('div', { class: 'leave' }, icon('clock'), `Be there by ${dates.time(e.arriveBy)}`) : null));
@@ -733,11 +757,33 @@ function teamThemesCard() {
     });
     return field(`${theme} games come from`, sel);
   });
+  const logos = store.setting(D(), 'teamLogos', {}) || {};
+  const logoRows = TEAM_THEMES.map((theme) => {
+    const input = h('input', { type: 'file', accept: 'image/png,image/jpeg,image/webp,image/svg+xml', hidden: true });
+    input.addEventListener('change', async () => {
+      const f = input.files[0];
+      input.value = '';
+      if (!f) return;
+      try {
+        const url = await logoData(f);
+        change((d) => store.setSetting(d, 'teamLogos', { ...(store.setting(d, 'teamLogos', {}) || {}), [theme]: url }));
+        toast(`${theme} logo added`);
+      } catch { toast("Couldn't open that image. Try a PNG or JPG."); }
+    });
+    return h('div', { class: 'logo-row' },
+      logos[theme] ? h('img', { class: 'logo-prev', src: logos[theme], alt: `${theme} logo` }) : h('span', { class: 'logo-prev empty-logo' }, icon('image')),
+      h('div', { class: 'row-value' }, `${theme} logo`, h('div', { class: 'muted small' }, logos[theme] ? 'Shown in the header and next to games' : 'None yet')),
+      h('button', { class: 'btn ghost small', onclick: () => input.click() }, logos[theme] ? 'Replace' : 'Add'),
+      logos[theme] ? h('button', { class: 'icon-btn faint', 'aria-label': `Remove ${theme} logo`, onclick: () => change((d) => { const x = { ...(store.setting(d, 'teamLogos', {}) || {}) }; delete x[theme]; return store.setSetting(d, 'teamLogos', x); }) }, icon('trash')) : null,
+      input);
+  });
   const today = gameDayTheme(events(), saved.list);
   return card(null, h('div', { class: 'stack' },
     toggleRow('Switch to the team theme on game days', Boolean(saved.on), (on) => save({ on })),
     h('p', { class: 'muted small' }, 'On a day with a game on that team\'s calendar, the app and the wall wear the team\'s colours. If both teams play, it shows whoever plays next. Practices don\'t count.'),
     saved.on ? h('div', { class: 'stack' }, pickers) : null,
+    h('div', { class: 'list' }, logoRows),
+    h('p', { class: 'muted small' }, 'Logos are kept in your Family Hub file in Drive, not in the app\'s public code. A PNG with a see-through background looks best.'),
     saved.on ? h('p', { class: 'small strong' }, today ? `Game day today: ${today}` : 'No team games today.') : null));
 }
 
