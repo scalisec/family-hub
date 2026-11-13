@@ -103,33 +103,43 @@ export function lanes(list) {
   return out;
 }
 
+// Events of 6 hours or more (a tournament day, a trip) go in the all-day strip at the top, so they
+// don't stretch the grid's hours and squeeze everything else.
+export const LONG = 6 * HOUR;
+export const isLong = (e) => !e.allDay && e.end - e.start >= LONG;
+const inStrip = (e) => e.allDay || isLong(e);
+
 const isToday = (d) => dates.dateKey(d) === dates.dateKey(new Date());
 
 /* ---------- Week: time grid ---------- */
 export function weekGrid(events, start, { tag, onEvent, onDay } = {}) {
   const days = Array.from({ length: 7 }, (_, i) => dates.addDays(start, i));
   const all = days.map((d) => eventsOn(events, d));
-  const timed = all.flat().filter((e) => !e.allDay);
+  const timed = all.flat().filter((e) => !inStrip(e));
   const [h0, h1] = hourRange(timed, days);
   const scale = hourScale(timed, days, h0, h1);
   const pct = (hrs) => `${scale.at(hrs) * 100}%`;
-  const hasAllDay = all.some((l) => l.some((e) => e.allDay));
+  const hasAllDay = all.some((l) => l.some(inStrip));
   const now = Date.now();
 
   const head = h('div', { class: 'cg-head' }, h('div'), days.map((d) => h('button', { class: `cg-day${isToday(d) ? ' today' : ''}`, type: 'button', onclick: onDay ? () => onDay(d) : null },
     h('span', { class: 'cg-dow' }, WEEKDAY_SHORT[d.getDay()]), h('span', { class: 'cg-num' }, String(d.getDate())))));
   const allDay = hasAllDay ? h('div', { class: 'cg-allday' }, h('div', { class: 'cg-gut' }, 'all day'),
-    all.map((list) => h('div', { class: 'cg-adcell' }, list.filter((e) => e.allDay).map((e) => h('button', { class: 'cg-ad', type: 'button', style: { background: e.color || 'var(--accent)' }, onclick: onEvent ? () => onEvent(e) : null }, e.title))))) : null;
+    all.map((list) => h('div', { class: 'cg-adcell' }, list.filter(inStrip).map((e) => h('button', { class: 'cg-ad', type: 'button', style: { background: e.color || 'var(--accent)' }, onclick: onEvent ? () => onEvent(e) : null },
+      isLong(e) ? h('span', { class: 'cg-adt' }, `${dates.time(e.start)} `) : null, e.title))))) : null;
 
   const hours = [];
   for (let hr = h0 + 1; hr < h1; hr += 1) hours.push(hr);
   // Label every busy hour, and only the first hour of each shrunk stretch.
   const label = (hr) => `${((hr + 11) % 12) + 1}${hr < 12 ? 'am' : 'pm'}`;
-  const shown = hours.filter((hr) => scale.weights[hr - h0] === 1 || scale.weights[hr - h0 - 1] === 1);
+  const wanted = hours.filter((hr) => scale.weights[hr - h0] === 1 || scale.weights[hr - h0 - 1] === 1);
+  // Thin the labels out when there are many, so they never pile up on a short screen.
+  const step = wanted.length > 14 ? 3 : wanted.length > 8 ? 2 : 1;
+  const shown = wanted.filter((hr, i) => i % step === 0);
   const gutter = h('div', { class: 'cg-gutter' }, shown.map((hr) => h('span', { style: { top: pct(hr) } }, label(hr))));
   const cols = days.map((d, i) => {
     const d0 = d.getTime();
-    const placed = lanes(all[i].filter((e) => !e.allDay).map((e) => ({ ...e, start: Math.max(e.start, d0 + h0 * HOUR), end: Math.min(e.end, d0 + h1 * HOUR), _orig: e })));
+    const placed = lanes(all[i].filter((e) => !inStrip(e)).map((e) => ({ ...e, start: Math.max(e.start, d0 + h0 * HOUR), end: Math.min(e.end, d0 + h1 * HOUR), _orig: e })));
     const col = h('div', { class: `cg-col${isToday(d) ? ' today' : ''}` },
       placed.map(({ e, lane, lanes: n }) => {
         const top = (e.start - d0) / HOUR;
@@ -145,7 +155,17 @@ export function weekGrid(events, start, { tag, onEvent, onDay } = {}) {
     return col;
   });
   const lines = hours.map((hr) => h('div', { class: `cg-line${scale.weights[hr - h0] === 1 || scale.weights[hr - h0 - 1] === 1 ? '' : ' faint'}`, style: { top: pct(hr) } }));
-  return h('div', { class: 'calgrid' }, head, allDay, h('div', { class: 'cg-body' }, gutter, h('div', { class: 'cg-cols' }, lines, cols)));
+  // Smallest comfortable height (phones): about 36 px per busy hour, 10 px per shrunk one. Taller
+  // screens like the wall stretch past this; short ones scroll, starting at the first event or now.
+  const minPx = Math.round(scale.weights.reduce((t, w) => t + (w === 1 ? 36 : 10), 0));
+  const inner = h('div', { class: 'cg-inner', style: { minHeight: `${minPx}px` } }, gutter, h('div', { class: 'cg-cols' }, lines, cols));
+  const body = h('div', { class: 'cg-body' }, inner);
+  const thisWeek = days.some(isToday);
+  const focus = thisWeek ? Math.max(h0, Math.min(h1, new Date().getHours() - 1)) : h0;
+  requestAnimationFrame(() => {
+    if (body.scrollHeight > body.clientHeight + 4) body.scrollTop = Math.max(0, scale.at(focus) * body.scrollHeight - 8);
+  });
+  return h('div', { class: 'calgrid' }, head, allDay, body);
 }
 
 /* ---------- Week: 7 columns ---------- */

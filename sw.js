@@ -1,7 +1,7 @@
 // Family Hub offline helper. Always asks GitHub for the newest copy of the app's own files
 // (a quick "has it changed?" check), and falls back to the saved copy when there's no signal,
 // so the app still opens offline. It never touches Google, the helper, or the weather.
-const CACHE = 'fh-shell-3.2.2';
+const CACHE = 'fh-shell-3.2.3';
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((c) => c.addAll(['./', 'index.html', 'css/app.css', 'js/app.js'])).catch(() => {}));

@@ -529,3 +529,16 @@ main#main.cal-full > .cal-screen { flex: 1; min-height: 0; gap: 4px; }
 .cg-ev { min-height: 1.45em; }
 .cg-ev.short { padding-top: 1px; padding-bottom: 1px; }
 .cg-ev.short b { -webkit-line-clamp: 1; }
+.cg-adt { font-weight: 500; opacity: .9; }
+.cg-gutter span { line-height: 1; }
+/* Grid scrolls on short screens instead of squeezing */
+.cg-body { display: block; overflow-y: auto; overscroll-behavior: contain; }
+.cg-inner { display: grid; grid-template-columns: 2.6em 1fr; height: 100%; }
+.wall .cg-body { overflow: hidden; }
+.wall .cg-inner { min-height: 0 !important; }
+@media (max-height: 520px) {
+  .cg-day { flex-direction: row; justify-content: center; gap: 4px; padding: 0 0 3px; }
+  .cg-num { width: 1.6em; height: 1.6em; font-size: 1.1em; }
+  .cal-bar { margin-bottom: 0; }
+  .cal-bar .icon-btn { width: 34px; height: 34px; }
+}
