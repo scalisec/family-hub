@@ -124,6 +124,14 @@ function mealsToday() {
     }));
 }
 
+// Lists you've pinned to the wall (packing, Black Friday...).
+function pinnedLists() {
+  return (snap().lists || []).map((l) => h('section', { class: 'card pinned-list' },
+    h('h2', null, h('span', { class: 'dot', style: { background: l.color || 'var(--accent)' } }), ` ${l.name}`),
+    l.items.length ? h('div', { class: 'gro' }, l.items.slice(0, 12).map((i) => h('span', { class: 'chip' }, i.text, i.who ? [' ', tag(i.who)] : null)),
+      l.items.length > 12 ? h('span', { class: 'muted small' }, `+${l.items.length - 12} more`) : null) : h('p', { class: 'empty' }, 'All done.')));
+}
+
 function todos() {
   const list = (snap().todos || []).slice(0, 8);
   if (!list.length) return h('p', { class: 'empty' }, 'All done.');
@@ -286,6 +294,7 @@ function render() {
       h('div', { class: 'col' }, tile('nextUp', 'Next up', h('div', null, nextUp()), 'grow'), tile('meals', 'Meals today', mealsToday())),
       h('div', { class: 'col' }, calendarTile()),
       h('div', { class: 'col' }, tile('todos', 'To-dos', h('div', null, todos()), 'grow'), tile('groceries', 'Groceries', groceries()),
+        pinnedLists(),
         photoSettings().tile !== false && photoIds().length ? h('section', { class: 'card photo-card' }, photoEl) : null)),
     daily()));
   dim();

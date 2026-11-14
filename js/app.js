@@ -19,7 +19,7 @@ const { state } = sync;
 const ui = {
   tab: sessionStorage.getItem('fh.tab') || 'today',
   calView: sessionStorage.getItem('fh.calView') || 'week',
-  meals: 'plan', mealsWeek: 0, lists: 'groceries', more: null, weekPart: 0,
+  meals: 'plan', mealsWeek: 0, lists: sessionStorage.getItem('fh.list') || 'groceries', more: null, weekPart: 0,
   todoWho: 'all', recipeSearch: '', weather: null, connecting: false, stale: false, scroll: {},
 };
 const TABS = [['today', 'Today'], ['week', 'Week'], ['meals', 'Meals'], ['lists', 'Lists'], ['more', 'More']];
@@ -242,7 +242,7 @@ function micButton(onText) {
 function sayOrType(prefill = '') {
   const input = h('input', { type: 'text', value: prefill, placeholder: 'Add milk and eggs', autofocus: true, enterkeyhint: 'done', autocomplete: 'off' });
   const preview = h('div', { class: 'preview' });
-  const update = () => { preview.replaceChildren(describe(parse(input.value, peopleList(), meId()))); };
+  const update = () => { preview.replaceChildren(describe(parse(input.value, peopleList(), meId(), new Date(), store.customLists(D())))); };
   input.addEventListener('input', update);
   input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { closeSheet(); handleSaid(input.value); } });
   update();
@@ -258,14 +258,16 @@ function sayOrType(prefill = '') {
 
 function describe(r) {
   if (r.kind === 'grocery') return h('div', { class: 'pv' }, icon('cart'), h('span', null, `Groceries: ${r.items.join(', ')}`));
+  if (r.kind === 'list') return h('div', { class: 'pv' }, icon('lists'), h('span', null, `${r.name}: ${r.items.join(', ')}`));
   if (r.kind === 'todo') return h('div', { class: 'pv' }, icon('lists'), h('span', null, `To-do for ${whoName(r.who)}: ${r.text}${r.due ? ` (${dates.dueLabel(r.due)})` : ''}`));
   if (r.kind === 'unknown') return h('div', { class: 'pv muted' }, icon('info'), h('span', null, "You'll pick the list"));
   return h('div', { class: 'pv muted' }, '');
 }
 
 function handleSaid(text) {
-  const r = parse(text, peopleList(), meId());
+  const r = parse(text, peopleList(), meId(), new Date(), store.customLists(D()));
   if (r.kind === 'empty') return;
+  if (r.kind === 'list') { addToList(r.list, r.items); return; }
   if (r.kind === 'grocery') { addGroceries(r.items); return; }
   if (r.kind === 'todo') { addTodo(r.text, r.who, r.due); return; }
   sheet('Add to which list?', h('div', { class: 'stack' }, h('p', { class: 'quoted' }, r.text)), { actions: [
@@ -641,9 +643,208 @@ function recipeEdit(id) {
 function listsScreen() {
   const openG = store.live(D(), 'groceries').filter((g) => !g.done).length;
   const openT = store.live(D(), 'todos').filter((t) => !t.done).length;
+  const mine = store.customLists(D());
+  if (!['groceries', 'todos'].includes(ui.lists) && !mine.some((l) => l.id === ui.lists)) ui.lists = 'groceries';
+  const pick = (v) => { ui.lists = v; sessionStorage.setItem('fh.list', v); render(); };
+  const chip = (id, label, n, extra) => h('button', { class: `chip list-chip${ui.lists === id ? ' on' : ''}`, onclick: () => pick(id) },
+    extra || null, label, n ? h('span', { class: 'count' }, String(n)) : null);
   return h('div', { class: 'screen' },
-    h('div', { class: 'toolbar' }, segmented([['groceries', `Groceries${openG ? ` ${openG}` : ''}`], ['todos', `To-dos${openT ? ` ${openT}` : ''}`]], ui.lists, (v) => { ui.lists = v; render(); })),
-    ui.lists === 'todos' ? todosView() : groceriesView());
+    h('div', { class: 'chips lists-bar' },
+      chip('groceries', 'Groceries', openG, icon('cart')),
+      chip('todos', 'To-dos', openT, icon('lists')),
+      mine.map((l) => chip(l.id, l.name, store.listItems(D(), l.id).filter((i) => !i.done).length,
+        h('span', { class: 'dot', style: { background: l.color || 'var(--accent)' } }))),
+      h('button', { class: 'chip add-chip', onclick: () => newListSheet() }, icon('plus'), 'New list')),
+    ui.lists === 'todos' ? todosView() : ui.lists === 'groceries' ? groceriesView() : customListView(ui.lists));
+}
+
+/* ---------- Your own lists ---------- */
+
+function featureToggles(features) {
+  const f = { who: false, note: false, price: false, ...features };
+  const opts = [['who', 'Who it\'s for', 'Tag a person on each item, e.g. Christmas gifts or who packs what'], ['note', 'Notes and links', 'Size, colour, or a link to the deal'], ['price', 'Prices', 'Adds a running total']];
+  const box = h('div', { class: 'list' }, opts.map(([k, label, hint]) => {
+    const r = h('button', { class: `row toggle${f[k] ? ' on' : ''}`, type: 'button', role: 'switch', 'aria-checked': String(f[k]), onclick: () => {
+      f[k] = !f[k]; r.classList.toggle('on', f[k]); r.setAttribute('aria-checked', String(f[k])); haptic();
+    } }, h('div', { class: 'row-value' }, label, h('div', { class: 'muted small' }, hint)), h('span', { class: 'switch' }, h('span', { class: 'knob' })));
+    return r;
+  }));
+  return { el: box, value: () => ({ ...f }) };
+}
+
+function newListSheet() {
+  const name = h('input', { type: 'text', placeholder: 'e.g. Christmas, Packing for Florida', autofocus: true, maxlength: '40' });
+  const feats = featureToggles({});
+  const templates = store.customLists(D(), { templates: true });
+  let from = '';
+  let color = store.LIST_COLORS[store.customLists(D()).length % store.LIST_COLORS.length];
+  const colors = h('div', { class: 'colors' }, store.LIST_COLORS.map((c) => {
+    const b = h('button', { class: `color${c === color ? ' on' : ''}`, style: { background: c }, 'aria-label': c, type: 'button', onclick: () => { color = c; colors.querySelectorAll('.color').forEach((x) => x.classList.toggle('on', x === b)); } });
+    return b;
+  }));
+  const tplBox = templates.length ? h('div', { class: 'chips wrap' },
+    [['', 'Blank list'], ...templates.map((t) => [t.id, `${t.name} (${store.listItems(D(), t.id).length})`])].map(([id, label]) => {
+      const b = h('button', { class: `chip${id === from ? ' on' : ''}`, type: 'button', onclick: () => {
+        from = id;
+        tplBox.querySelectorAll('.chip').forEach((x) => x.classList.toggle('on', x === b));
+        const t = id && store.get(D(), 'lists', id);
+        if (t && !name.value.trim()) name.value = t.name;
+      } }, label);
+      return b;
+    })) : null;
+  sheet('New list', h('div', { class: 'stack' },
+    field('Name', name),
+    tplBox ? field('Start from', h('div', { class: 'stack' }, tplBox, h('button', { class: 'link small', type: 'button', onclick: () => templatesSheet() }, 'Manage templates'))) : null,
+    field('Each item can have', feats.el, 'Leave all off for a simple checklist. You can change this later.'),
+    field('Colour', colors)),
+  { actions: [h('button', { class: 'btn', onclick: () => {
+    const n = name.value.trim();
+    if (!n) { name.focus(); return; }
+    let newId = '';
+    change((d) => { const r = store.createList(d, { name: n.slice(0, 40), features: feats.value(), color, from }); newId = r.id; return r.data; });
+    closeSheet();
+    ui.lists = newId;
+    render();
+    toast(from ? `${n} created from the template` : `${n} created`);
+  } }, 'Create list')] });
+}
+
+function templatesSheet() {
+  const draw = () => {
+    const t = store.customLists(D(), { templates: true });
+    return t.length ? h('div', { class: 'list' }, t.map((x) => h('div', { class: 'item' },
+      h('div', { class: 'item-text' }, x.name, h('div', { class: 'muted small' }, `${store.listItems(D(), x.id).length} items`)),
+      h('button', { class: 'icon-btn faint', 'aria-label': `Delete template ${x.name}`, onclick: () => { change((d) => store.deleteList(d, x.id)); body.replaceChildren(draw()); toast('Template deleted'); } }, icon('trash')))))
+      : h('p', { class: 'muted' }, 'No templates yet. When you delete a list, you can keep it as a template.');
+  };
+  const body = h('div', null, draw());
+  sheet('Templates', body);
+}
+
+function customListView(id) {
+  const l = store.get(D(), 'lists', id);
+  const f = l.features || {};
+  const items = store.listItems(D(), id);
+  const open = items.filter((i) => !i.done);
+  const done = items.filter((i) => i.done);
+  const tot = f.price ? store.listTotals(D(), id) : null;
+  const money = (n) => n.toLocaleString('en-CA', { style: 'currency', currency: 'CAD' });
+  return h('div', null,
+    h('div', { class: 'list-head' },
+      h('h2', { class: 'list-title' }, h('span', { class: 'dot big', style: { background: l.color || 'var(--accent)' } }), l.name),
+      l.pinned ? h('span', { class: 'pin-badge' }, icon('tv'), 'On the wall') : null,
+      h('button', { class: 'icon-btn', 'aria-label': 'List options', onclick: () => listMenu(id) }, icon('more'))),
+    addInput(`Add to ${l.name}`, (v) => addToList(id, splitItems(v).length > 1 ? splitItems(v) : [v.trim()])),
+    card(null, open.length ? h('div', { class: 'list' }, open.map((it) => listItemRow(l, it))) : empty(items.length ? 'All ticked off.' : 'Nothing on this list yet.')),
+    tot && (tot.total > 0) ? h('div', { class: 'totals' }, h('span', null, 'Total ', h('b', null, money(tot.total))), h('span', { class: 'muted' }, 'Still to get ', h('b', null, money(tot.left)))) : null,
+    done.length ? card(`Done (${done.length})`, h('div', { class: 'list' }, done.map((it) => listItemRow(l, it))),
+      h('button', { class: 'link', onclick: () => { const ids = done.map((x) => x.id); change((d) => ids.reduce((x, iid) => store.remove(x, 'items', iid), d)); toast('Cleared'); } }, 'Clear')) : null);
+}
+
+function addToList(listId, texts) {
+  const l = store.get(D(), 'lists', listId);
+  if (!l) return;
+  const have = new Set(store.listItems(D(), listId).filter((i) => !i.done).map((i) => i.text.toLowerCase()));
+  const fresh = texts.map((t) => t.trim()).filter((t) => t && !have.has(t.toLowerCase()));
+  if (!fresh.length) { toast('Already on the list'); return; }
+  const base = store.listItems(D(), listId).length;
+  const added = [];
+  change((d) => fresh.reduce((x, text, i) => { const iid = store.newId(); added.push(iid); return store.put(x, 'items', { id: iid, list: listId, text: text.slice(0, 120), done: false, order: base + i }); }, d));
+  haptic();
+  toast(`Added to ${l.name}: ${fresh.join(', ')}`, { action: 'Undo', onAction: () => change((d) => added.reduce((x, iid) => store.remove(x, 'items', iid), d)) });
+}
+
+function listItemRow(l, it) {
+  const f = l.features || {};
+  const el = h('div', { class: `item${it.done ? ' done' : ''}` },
+    h('button', { class: 'check', 'aria-label': it.done ? 'Not done' : 'Done', onclick: () => { haptic(); el.classList.toggle('done'); setTimeout(() => change((d) => store.put(d, 'items', { id: it.id, done: !it.done })), 180); } }, icon('check')),
+    h('button', { class: 'item-text plain', onclick: () => itemSheet(l.id, it.id) },
+      h('span', { class: 'it-main' }, it.text,
+        f.note && (it.note || it.link) ? h('span', { class: 'muted small it-note' }, it.note || '', it.link ? h('span', { class: 'it-link' }, icon('link'), linkHost(it.link)) : null) : null),
+      f.price && Number(it.price) ? h('span', { class: 'price' }, Number(it.price).toLocaleString('en-CA', { style: 'currency', currency: 'CAD' })) : null),
+    f.who && it.who ? tag(it.who) : null);
+  return el;
+}
+
+function linkHost(url) { try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return 'link'; } }
+
+function itemSheet(listId, itemId) {
+  const l = store.get(D(), 'lists', listId);
+  const it = store.get(D(), 'items', itemId);
+  if (!l || !it) return;
+  const f = l.features || {};
+  const text = h('input', { type: 'text', value: it.text, maxlength: '120' });
+  const who = f.who ? h('select', null, [['', 'Nobody'], ['family', 'Family'], ...peopleList().map((p) => [p.id, p.name])].map(([v, lbl]) => h('option', { value: v, selected: (it.who || '') === v }, lbl))) : null;
+  const note = f.note ? h('input', { type: 'text', value: it.note || '', placeholder: 'Size, colour, store...', maxlength: '200' }) : null;
+  const link = f.note ? h('input', { type: 'url', value: it.link || '', placeholder: 'https://' }) : null;
+  const price = f.price ? h('input', { type: 'number', inputmode: 'decimal', step: '0.01', min: '0', value: it.price ?? '', placeholder: '0.00' }) : null;
+  sheet(it.text, h('div', { class: 'stack' },
+    field('Item', text),
+    who ? field(l.name.toLowerCase().includes('christmas') ? 'For' : 'Who', who) : null,
+    note ? field('Note', note) : null,
+    link ? field('Link', link) : null,
+    link && it.link ? h('a', { class: 'btn ghost', href: it.link, target: '_blank', rel: 'noopener' }, icon('link'), `Open ${linkHost(it.link)}`) : null,
+    price ? field('Price', price) : null),
+  { actions: [
+    h('button', { class: 'btn ghost danger', onclick: () => { change((d) => store.remove(d, 'items', itemId)); closeSheet(); toast('Removed', { action: 'Undo', onAction: () => change((d) => store.put(d, 'items', { ...it, u: undefined })) }); } }, icon('trash'), 'Remove'),
+    h('button', { class: 'btn', onclick: () => {
+      const url = link ? link.value.trim() : '';
+      change((d) => store.put(d, 'items', { id: itemId, text: text.value.trim() || it.text,
+        ...(who ? { who: who.value } : {}), ...(note ? { note: note.value.trim() } : {}),
+        ...(link ? { link: /^https?:\/\//i.test(url) ? url : '' } : {}),
+        ...(price ? { price: price.value === '' ? '' : Math.max(0, Math.round(Number(price.value) * 100) / 100) } : {}) }));
+      closeSheet();
+    } }, 'Save'),
+  ] });
+}
+
+function listMenu(id) {
+  const l = store.get(D(), 'lists', id);
+  const name = h('input', { type: 'text', value: l.name, maxlength: '40' });
+  const feats = featureToggles(l.features || {});
+  const pin = toggleRow('Show on the wall', Boolean(l.pinned), (on) => { change((d) => store.put(d, 'lists', { id, pinned: on })); closeSheet(); toast(on ? `${l.name} is on the wall` : `${l.name} is off the wall`); });
+  sheet(l.name, h('div', { class: 'stack' },
+    field('Name', name),
+    field('Each item can have', feats.el),
+    h('div', { class: 'list' }, pin),
+    h('div', { class: 'list' },
+      row({ onclick: () => { change((d) => store.saveTemplate(d, id)); toast(`Saved ${l.name} as a template`); } }, h('span', { class: 'menu-ic' }, icon('copy')),
+        h('div', { class: 'row-value' }, 'Save as template', h('div', { class: 'muted small' }, 'Keep a copy to start from next time'))),
+      row({ onclick: () => deleteListSheet(id) }, h('span', { class: 'menu-ic danger-ic' }, icon('trash')),
+        h('div', { class: 'row-value' }, 'Delete list', h('div', { class: 'muted small' }, 'When the trip or event is done')))),
+  ), { actions: [h('button', { class: 'btn', onclick: () => {
+    change((d) => store.put(d, 'lists', { id, name: name.value.trim().slice(0, 40) || l.name, features: feats.value() }));
+    closeSheet();
+  } }, 'Save')] });
+}
+
+function deleteListSheet(id) {
+  const l = store.get(D(), 'lists', id);
+  const n = store.listItems(D(), id).length;
+  const keep = h('input', { type: 'checkbox' });
+  sheet(`Delete ${l.name}?`, h('div', { class: 'stack' },
+    h('p', null, `This removes the list and its ${n} item${n === 1 ? '' : 's'}.`),
+    h('label', { class: 'checkline' }, keep, h('span', null, 'Save it as a template first (for next time)'))),
+  { actions: [
+    h('button', { class: 'btn ghost', onclick: () => closeSheet() }, 'Cancel'),
+    h('button', { class: 'btn danger-fill', onclick: () => {
+      const before = D();
+      change((d) => store.deleteList(keep.checked ? store.saveTemplate(d, id) : d, id));
+      closeSheet();
+      ui.lists = 'groceries';
+      render();
+      toast(keep.checked ? `${l.name} deleted and saved as a template` : `${l.name} deleted`, { action: 'Undo', ms: 6000, onAction: () => {
+        // Bring the list and its items back as they were.
+        change((d) => {
+          let x = store.put(d, 'lists', { ...before.lists[id], u: undefined });
+          for (const it of store.live(before, 'items').filter((i) => i.list === id)) x = store.put(x, 'items', { ...it, u: undefined });
+          return x;
+        });
+        ui.lists = id;
+        render();
+      } });
+    } }, 'Delete'),
+  ] });
 }
 
 function addInput(placeholder, onAdd) {

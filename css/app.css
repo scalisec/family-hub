@@ -554,3 +554,26 @@ main#main.cal-full > .cal-screen { flex: 1; min-height: 0; gap: 4px; }
 .banner.slim .muted { display: none; }
 .banner.slim strong { font-size: .92rem; }
 .banner.slim .btn { min-height: 32px; }
+
+/* Your own lists */
+.lists-bar { padding-bottom: 6px; }
+.list-chip .ic { width: 16px; height: 16px; }
+.list-chip .count { background: var(--chip); border-radius: 999px; padding: 0 7px; font-size: .78rem; margin-left: 2px; }
+.chip.on .count { background: rgba(255,255,255,.2); }
+.add-chip { border-style: dashed; color: var(--accent); }
+.add-chip .ic { width: 16px; height: 16px; }
+.chips.wrap { flex-wrap: wrap; overflow: visible; }
+.list-head { display: flex; align-items: center; gap: 10px; margin: 2px 2px 10px; }
+.list-title { font-size: 1.35rem; display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
+.dot.big { width: .7em; height: .7em; }
+.pin-badge { display: inline-flex; align-items: center; gap: 4px; font-size: .78rem; font-weight: 700; color: var(--accent); background: var(--accent-soft); border-radius: 999px; padding: 3px 9px; }
+.pin-badge .ic { width: 14px; height: 14px; }
+.it-main { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.it-note { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.it-link { display: inline-flex; align-items: center; gap: 3px; color: var(--accent); }
+.it-link .ic { width: 13px; height: 13px; }
+.price { font-weight: 700; white-space: nowrap; margin-left: auto; }
+.totals { display: flex; justify-content: space-between; gap: 12px; padding: 10px 6px 4px; font-size: .95rem; }
+.danger-ic { color: #B91C1C; }
+.link.small { font-size: .85rem; align-self: flex-start; }
+.wall .pinned-list h2 { display: flex; align-items: center; gap: .3em; }

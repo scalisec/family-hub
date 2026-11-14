@@ -4,7 +4,8 @@
 // so a phone that was offline can't bring the item back. Two copies merge record by record: the newer
 // change wins. That way two people editing different things at once never lose each other's changes.
 
-export const COLLECTIONS = ['people', 'feeds', 'rules', 'recipes', 'meals', 'groceries', 'todos', 'settings'];
+// lists: your own lists (Christmas, packing...). items: what's on them (item.list = the list's id).
+export const COLLECTIONS = ['people', 'feeds', 'rules', 'recipes', 'meals', 'groceries', 'todos', 'settings', 'lists', 'items'];
 import { THEMES, resolveTheme, gameDayTheme } from './themes.js';
 
 export { THEMES };
@@ -104,6 +105,7 @@ export function prune(data, now = Date.now()) {
       if (r.del && now - r.u > 30 * DAY) continue;
       if (c === 'groceries' && r.done && now - r.u > 7 * DAY) continue;
       if (c === 'meals' && !r.del && r.date && r.date < dateKey(new Date(now - 60 * DAY))) continue;
+      if (c === 'items' && !r.del && r.list && data.lists && data.lists[r.list] && data.lists[r.list].del) continue;
       out[c][id] = r;
     }
   }
@@ -157,6 +159,10 @@ export function snapshot(data, now = Date.now()) {
     teamThemes: setting(data, 'teamThemes', null),
     teamLogos: setting(data, 'teamLogos', {}),
     calendar: setting(data, 'calendar', {}),
+    lists: customLists(data).filter((l) => l.pinned).slice(0, 4).map((l) => ({
+      name: l.name, color: l.color || '',
+      items: listItems(data, l.id).filter((i) => !i.done).slice(0, 30).map((i) => ({ text: i.text, who: l.features && l.features.who ? i.who || '' : '' })),
+    })),
     photos: photoSettings(data),
     layout: layout(data),
     dim: setting(data, 'dim', { from: '22:00', to: '06:00' }),
@@ -182,6 +188,65 @@ export function photoSettings(data) {
     night: Boolean(s.night),
     every: [10, 20, 30, 60, 120].includes(Number(s.every)) ? Number(s.every) : 30,
   };
+}
+
+/* ---------- Custom lists ---------- */
+export const LIST_COLORS = ['#2563EB', '#DC2626', '#16A34A', '#9333EA', '#EA580C', '#0891B2', '#CA8A04', '#DB2777'];
+export function customLists(data, { templates = false } = {}) {
+  return live(data, 'lists').filter((l) => Boolean(l.template) === templates)
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || (a.u - b.u));
+}
+export function listItems(data, listId) {
+  return live(data, 'items').filter((i) => i.list === listId)
+    .sort((a, b) => (a.done ? 1 : 0) - (b.done ? 1 : 0) || (a.order ?? a.u) - (b.order ?? b.u));
+}
+export function listTotals(data, listId) {
+  let total = 0;
+  let left = 0;
+  for (const i of listItems(data, listId)) {
+    const p = Number(i.price) || 0;
+    total += p;
+    if (!i.done) left += p;
+  }
+  return { total, left };
+}
+
+// A new list, optionally copied from a template (its items come across unticked).
+export function createList(data, { name, features = {}, color = '', from = '' }, now = Date.now()) {
+  const id = newId();
+  const order = customLists(data).length;
+  let d = put(data, 'lists', { id, name, features: { who: Boolean(features.who), note: Boolean(features.note), price: Boolean(features.price) }, color, pinned: false, template: false, order }, now);
+  if (from) {
+    const t = get(data, 'lists', from);
+    if (t) {
+      d = put(d, 'lists', { id, features: { ...t.features }, color: color || t.color || '' }, now);
+      listItems(data, from).forEach((it, i) => {
+        d = put(d, 'items', { list: id, text: it.text, who: it.who || '', note: it.note || '', link: it.link || '', price: it.price ?? '', done: false, order: i }, now);
+      });
+    }
+  }
+  return { data: d, id };
+}
+
+// Keeps a copy of a list (all unticked) to reuse next time. Replaces a template with the same name.
+export function saveTemplate(data, listId, now = Date.now()) {
+  const l = get(data, 'lists', listId);
+  if (!l) return data;
+  let d = data;
+  for (const old of customLists(d, { templates: true }).filter((t) => t.name.toLowerCase() === l.name.toLowerCase())) d = deleteList(d, old.id, now);
+  const tid = newId();
+  d = put(d, 'lists', { id: tid, name: l.name, features: { ...l.features }, color: l.color || '', template: true, pinned: false }, now);
+  listItems(data, listId).forEach((it, i) => {
+    d = put(d, 'items', { list: tid, text: it.text, who: it.who || '', note: it.note || '', link: it.link || '', price: it.price ?? '', done: false, order: i }, now);
+  });
+  return d;
+}
+
+// Deletes a list and everything on it.
+export function deleteList(data, listId, now = Date.now()) {
+  let d = remove(data, 'lists', listId, now);
+  for (const it of live(data, 'items').filter((i) => i.list === listId)) d = remove(d, 'items', it.id, now);
+  return d;
 }
 
 export function byDue(a, b) {

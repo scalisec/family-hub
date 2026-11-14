@@ -43,8 +43,8 @@ export function takeDue(text, now = new Date()) {
   return { text: tidy(t.slice(0, m.index)), due: dateKey(d) };
 }
 
-// people: [{ id, name }]. meId: the person "me" means.
-export function parse(input, people = [], meId = '', now = new Date()) {
+// people: [{ id, name }]. meId: the person "me" means. lists: your own lists [{ id, name }].
+export function parse(input, people = [], meId = '', now = new Date(), lists = []) {
   let s = tidy(input).replace(/[’]/g, "'");
   if (!s) return { kind: 'empty' };
 
@@ -89,6 +89,22 @@ export function parse(input, people = [], meId = '', now = new Date()) {
     if (p && !p.rest) {
       const { text, due } = takeDue(m[2], now);
       if (text) return { kind: 'todo', text: cap(text), who: p.id, due };
+    }
+  }
+
+  // your own lists: "add sunscreen to the packing list", "add Lego for Sam to Christmas"
+  const named = lists.filter((l) => l && l.name).sort((a, b) => b.name.length - a.name.length);
+  if (named.length) {
+    m = /^(?:add|put)\s+(.+?)\s+(?:to|on)\s+(?:the\s+|my\s+|our\s+)?(.+?)(?:\s+list)?$/i.exec(s)
+      || /^(.+?)\s+(?:to|on)\s+(?:the\s+|my\s+|our\s+)?(.+?)\s+list$/i.exec(s);
+    if (m) {
+      const want = tidy(m[2]).toLowerCase().replace(/\s+list$/, '');
+      const hit = named.find((l) => l.name.toLowerCase() === want) || named.find((l) => l.name.toLowerCase().replace(/\s+list$/, '') === want)
+        || named.find((l) => l.name.toLowerCase().startsWith(want) || want.startsWith(l.name.toLowerCase()));
+      if (hit && !/^(grocery|groceries|shopping)$/i.test(want)) {
+        const items = splitItems(m[1]);
+        if (items.length) return { kind: 'list', list: hit.id, name: hit.name, items };
+      }
     }
   }
 

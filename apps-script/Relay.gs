@@ -136,7 +136,7 @@ function syncKey_(s) {
 
 function cleanSnapshot_(s) {
   const out = {};
-  ['people', 'feeds', 'rules', 'meals', 'groceries', 'todos'].forEach(function (k) {
+  ['people', 'feeds', 'rules', 'meals', 'groceries', 'todos', 'lists'].forEach(function (k) {
     out[k] = Array.isArray(s[k]) ? s[k].slice(0, 400) : [];
   });
   out.homeAddress = String(s.homeAddress || '').slice(0, 200);

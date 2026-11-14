@@ -1,8 +1,13 @@
 // The app's version and release history (newest first). Keep VERSION, package.json and
 // version.json in step: the tests check they match.
-export const VERSION = '3.2.3';
+export const VERSION = '3.3.0';
 
 export const RELEASES = [
+  { version: '3.3.0', date: '2026-11-14', notes: [
+    'Your own lists in the Lists tab: Christmas, Black Friday, packing for a trip and more. Pick what each list tracks: who it\'s for, notes and links, prices with a running total.',
+    'Delete a whole list when the trip or event is done, and save it as a template to reuse next time.',
+    'Pin a list to the wall. Say or type works too: "add sunscreen to the packing list".',
+  ] },
   { version: '3.2.3', date: '2026-11-13', notes: ['Events of 6 hours or more (like a tournament day) move to the top strip so they no longer squeeze the week.', 'Hour labels no longer pile up.', 'On phones the week grid keeps tiles readable and scrolls if needed, starting at the current time.', 'Event times always show at the top of each tile, and light colours like yellow get dark text.', 'Slimmer reconnect bar above the week.'] },
   { version: '3.2.2', date: '2026-11-13', notes: ['Bigger event tiles in week view: the grid only shows the hours your week uses, and empty stretches of the day shrink so events get the room.'] },
   { version: '3.2.1', date: '2026-11-13', notes: ['Week view goes full screen: on the phone just one slim toolbar, and on the wall just a thin bar with the date, clock, next leave-by time and weather.'] },

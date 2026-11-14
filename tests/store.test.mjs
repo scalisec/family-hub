@@ -109,3 +109,36 @@ test('the old version\'s setup comes across', () => {
   assert.equal(store.setting(d, 'place').lat, 43.6);
   assert.equal(store.setting(d, 'me'), store.live(d, 'people').find((p) => p.name === 'Mom').id);
 });
+
+test('custom lists: create, template, delete', () => {
+  let d = store.emptyData();
+  const r = store.createList(d, { name: 'Packing', features: { who: true, price: false } }, 1000);
+  d = r.data;
+  d = store.put(d, 'items', { list: r.id, text: 'Sunscreen', done: true, order: 0 }, 1001);
+  d = store.put(d, 'items', { list: r.id, text: 'Hats', who: 'k', order: 1 }, 1002);
+  assert.equal(store.listItems(d, r.id).length, 2);
+  d = store.saveTemplate(d, r.id, 2000);
+  const t = store.customLists(d, { templates: true });
+  assert.equal(t.length, 1);
+  assert.ok(store.listItems(d, t[0].id).every((i) => !i.done), 'template items start unticked');
+  d = store.deleteList(d, r.id, 3000);
+  assert.equal(store.customLists(d).length, 0);
+  assert.equal(store.live(d, 'items').filter((i) => i.list === r.id).length, 0);
+  const again = store.createList(d, { name: 'Packing again', from: t[0].id }, 4000);
+  assert.equal(store.listItems(again.data, again.id).length, 2);
+  assert.equal(store.get(again.data, 'lists', again.id).features.who, true);
+  // saving the same name again replaces the old template
+  const d2 = store.saveTemplate(again.data, again.id, 5000);
+  assert.equal(store.customLists(d2, { templates: true }).length, 2); // different name, so both kept
+});
+
+test('custom lists: totals and pinned lists on the wall', () => {
+  let d = store.emptyData();
+  const r = store.createList(d, { name: 'Black Friday', features: { price: true } }, 1000);
+  d = store.put(r.data, 'items', { list: r.id, text: 'TV', price: 499.99 }, 1001);
+  d = store.put(d, 'items', { list: r.id, text: 'Socks', price: 10, done: true }, 1002);
+  assert.deepEqual(store.listTotals(d, r.id), { total: 509.99, left: 499.99 });
+  assert.equal(store.snapshot(d).lists.length, 0);
+  d = store.put(d, 'lists', { id: r.id, pinned: true }, 1003);
+  assert.deepEqual(store.snapshot(d).lists, [{ name: 'Black Friday', color: '', items: [{ text: 'TV', who: '' }] }]);
+});

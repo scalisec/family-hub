@@ -37,3 +37,13 @@ test('unknown and empty', () => {
 test('splitItems', () => {
   assert.deepEqual(splitItems('a dozen eggs, milk & a loaf of bread'), ['Dozen eggs', 'Milk', 'Loaf of bread']);
 });
+
+test('your own lists', () => {
+  const lists = [{ id: 'x', name: 'Christmas' }, { id: 'p', name: 'Packing for Florida' }, { id: 'b', name: 'Black Friday' }];
+  const q = (s) => parse(s, people, 'c', thu, lists);
+  assert.deepEqual(q('add sunscreen and hats to the packing list'), { kind: 'list', list: 'p', name: 'Packing for Florida', items: ['Sunscreen', 'Hats'] });
+  assert.deepEqual(q('add Lego set to Christmas'), { kind: 'list', list: 'x', name: 'Christmas', items: ['Lego set'] });
+  assert.deepEqual(q('air fryer to the black friday list'), { kind: 'list', list: 'b', name: 'Black Friday', items: ['Air fryer'] });
+  assert.equal(q('add milk to the grocery list').kind, 'grocery');
+  assert.equal(q('add milk').kind, 'grocery');
+});
