@@ -999,6 +999,28 @@ function installCard() {
     how ? h('p', { class: 'muted small install-how' }, how) : null);
 }
 
+// The app's own address, without any page, search or #part, so a shared link is always just the app.
+function appLink() { const u = new URL('./', location.href); u.search = ''; u.hash = ''; return u.href; }
+
+async function shareApp() {
+  const url = appLink();
+  const data = { title: 'Family Hub', text: 'Family Hub, our family calendar and organizer', url };
+  if (navigator.share && (!navigator.canShare || navigator.canShare(data))) {
+    try { await navigator.share(data); return; } catch (err) { if (err && err.name === 'AbortError') return; }
+  }
+  try { await navigator.clipboard.writeText(url); toast('Link copied'); } catch { toast(url, { ms: 6000 }); }
+}
+
+function shareCard() {
+  return card('Share Family Hub', h('div', { class: 'stack' },
+    h('p', { class: 'muted small' }, 'Send the app\'s link by text, email or any app on your phone. It opens Family Hub, which they can install too. For now only your Google account can see the family\'s data.'),
+    h('div', { class: 'btn-row' },
+      h('button', { class: 'btn', onclick: shareApp }, icon('share'), 'Share'),
+      h('button', { class: 'btn ghost', onclick: async () => {
+        try { await navigator.clipboard.writeText(appLink()); toast('Link copied'); } catch { toast(appLink(), { ms: 6000 }); }
+      } }, icon('copy'), 'Copy link'))));
+}
+
 function morePage(page) {
   switch (page) {
     case 'themes': return themesPage();
@@ -1404,6 +1426,7 @@ function aboutPage() {
   const status = h('span', { class: 'muted small' });
   return h('div', { class: 'stack' },
     installCard(),
+    shareCard(),
     card(`Version ${VERSION}`, h('div', { class: 'btn-row' },
       h('button', { class: 'btn ghost', onclick: async () => {
         status.textContent = 'Checking...';

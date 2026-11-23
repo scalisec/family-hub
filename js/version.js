@@ -1,8 +1,9 @@
 // The app's version and release history (newest first). Keep VERSION, package.json and
 // version.json in step: the tests check they match.
-export const VERSION = '3.3.0';
+export const VERSION = '3.3.1';
 
 export const RELEASES = [
+  { version: '3.3.1', date: '2026-11-23', notes: ['Share button in More > About and updates: send the Family Hub link by text, email or any app, or copy it.'] },
   { version: '3.3.0', date: '2026-11-14', notes: [
     'Your own lists in the Lists tab: Christmas, Black Friday, packing for a trip and more. Pick what each list tracks: who it\'s for, notes and links, prices with a running total.',
     'Delete a whole list when the trip or event is done, and save it as a template to reuse next time.',
