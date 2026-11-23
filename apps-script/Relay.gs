@@ -7,8 +7,10 @@
  *  2. Works out leave-by times with Google Maps drive times.
  *  3. Serves the wall screen a read-only feed through a secret link (?key=...).
  *
- * Only the owner can change anything: every change request must carry the owner's own Google sign-in,
- * which is checked with Google before anything happens. The wall link is read-only and can be replaced
+ * Only the family can change anything: every change request must carry a Google sign-in that is checked
+ * with Google before anything happens. The owner can let other family members in (More > Family access);
+ * they share the family's data through a copy kept here, because their own Google accounts can't see the
+ * owner's Drive file. Setup jobs (calendars, wall link, removing photos, family access) stay owner-only. The wall link is read-only and can be replaced
  * at any time from the app (More > Wall > New link).
  *
  * No personal details live in this code. Calendars, people, rules and the home address come from the
@@ -42,15 +44,24 @@ function doGet(e) {
   }
 }
 
-/** Owner actions from the app. Body is text/plain JSON: { token, action, data }. */
+// What a family member (not the owner) may do.
+const MEMBER_ACTIONS = ['hello', 'publish', 'feed', 'sync', 'instacart', 'photoAdd', 'photoList', 'dataVer', 'dataGet', 'dataPut'];
+
+/** Actions from the app. Body is text/plain JSON: { token, action, data }. */
 function doPost(e) {
   let req;
   try { req = JSON.parse((e && e.postData && e.postData.contents) || '{}'); } catch (err) { return json_({ ok: false, error: 'Bad request.' }); }
   try {
-    verify_(String(req.token || ''));
+    const who = verify_(String(req.token || ''));
+    const action = String(req.action || '');
+    if (who.role !== 'owner' && MEMBER_ACTIONS.indexOf(action) < 0) throw codeErr_('Only the Family Hub owner can change this.', 'denied');
     const data = req.data || {};
-    switch (String(req.action || '')) {
-      case 'hello': return json_({ ok: true, hello: hello_() });
+    switch (action) {
+      case 'hello': return json_({ ok: true, hello: hello_(who) });
+      case 'family': return json_({ ok: true, family: family_(data) });
+      case 'dataVer': return json_({ ok: true, version: sharedVersion_() });
+      case 'dataGet': return json_(Object.assign({ ok: true }, sharedGet_()));
+      case 'dataPut': return json_(Object.assign({ ok: true }, sharedPut_(data)));
       case 'calendars': return json_({ ok: true, calendars: calendars_() });
       case 'publish': return json_({ ok: true, feed: publish_(data.snapshot || {}), daily: daily_() });
       case 'feed': return json_({ ok: true, feed: feedOrSync_(), daily: daily_() });
@@ -80,32 +91,92 @@ function owner_() {
   return owner;
 }
 
-/** Asks Google who the sign-in belongs to. Must be this app's sign-in and the owner's account. */
+/** Family members the owner has let in (emails, lower case). Kept in script properties, never in code. */
+function members_() {
+  try { return JSON.parse(props_().getProperty('FAMILY_EMAILS') || '[]'); } catch (err) { return []; }
+}
+
+/**
+ * Asks Google who the sign-in belongs to. Must be this app's sign-in, and the owner's account or one the
+ * owner has let in. Returns { email, role: 'owner' | 'member' }.
+ */
 function verify_(token) {
   if (!token || token.length > 4096) throw codeErr_('Sign in with Google first.', 'signin');
   const cache = CacheService.getScriptCache();
-  const ck = 'tok:' + md5_(token);
-  if (cache.get(ck) === 'ok') return;
+  const ck = 'tok2:' + md5_(token);
+  const hit = cache.get(ck);
+  if (hit) {
+    const who = JSON.parse(hit);
+    // Someone removed from family access loses it straight away, even with a sign-in that's still running.
+    if (who.role === 'owner' || members_().indexOf(who.email) >= 0) return who;
+    cache.remove(ck);
+  }
   const res = UrlFetchApp.fetch('https://oauth2.googleapis.com/tokeninfo?access_token=' + encodeURIComponent(token), { muteHttpExceptions: true });
   if (res.getResponseCode() !== 200) throw codeErr_('Your Google sign-in has run out. Press Connect Google again.', 'signin');
   const info = JSON.parse(res.getContentText());
   if (info.aud !== CLIENT_ID && info.azp !== CLIENT_ID) throw codeErr_('That sign-in is not from Family Hub.', 'denied');
   const email = String(info.email || '').toLowerCase();
-  if (!email || email !== owner_()) throw codeErr_('Only the Family Hub owner can do this.', 'denied');
+  let role = '';
+  if (email && email === owner_()) role = 'owner';
+  else if (email && members_().indexOf(email) >= 0) role = 'member';
+  if (!role) throw codeErr_('This Google account (' + email + ') hasn\'t been given access to Family Hub. Ask the owner to add it in More > Family access.', 'denied');
+  const who = { email: email, role: role };
   const left = Math.max(60, Math.min(3000, Number(info.expires_in) || 0) - 60);
-  cache.put(ck, 'ok', left);
+  cache.put(ck, JSON.stringify(who), left);
+  return who;
 }
 
 function codeErr_(msg, code) { const e = new Error(msg); e.code = code; return e; }
 
 /* ---------- Actions ---------- */
 
-function hello_() {
-  ensureTrigger_();
+function hello_(who) {
+  if (who.role === 'owner') ensureTrigger_();
   let key = props_().getProperty('WALL_KEY');
-  if (!key) key = newWallKey_();
+  if (!key && who.role === 'owner') key = newWallKey_();
   const feed = load_('feed');
-  return { owner: owner_(), wallKey: key, updated: feed ? feed.updated : 0 };
+  return { owner: owner_(), role: who.role, email: who.email, family: members_().length, shared: sharedVersion_(),
+           wallKey: key || '', updated: feed ? feed.updated : 0 };
+}
+
+/** Owner only. data: { emails: [...] } replaces the list; with no emails, just returns it. */
+function family_(data) {
+  if (Array.isArray(data.emails)) {
+    const clean = [];
+    data.emails.slice(0, 12).forEach(function (e) {
+      const v = String(e || '').trim().toLowerCase();
+      if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) && v !== owner_() && clean.indexOf(v) < 0) clean.push(v);
+    });
+    props_().setProperty('FAMILY_EMAILS', JSON.stringify(clean));
+  }
+  return members_();
+}
+
+/* ---------- The family's shared copy (for family members, who can't see the owner's Drive file) ---------- */
+// The app merges record by record (newer change wins) before saving, so the helper only has to refuse a
+// save that was based on an older copy; the app then merges again and retries.
+
+function sharedVersion_() { return props_().getProperty('SHARED_VER') || ''; }
+
+function sharedGet_() { return { data: load_('shared'), version: sharedVersion_() }; }
+
+/** data: { data, base }. Saves only if base is the current version; otherwise returns the current copy. */
+function sharedPut_(req) {
+  if (!req.data || typeof req.data !== 'object') throw new Error('Nothing to save.');
+  const text = JSON.stringify(req.data);
+  if (text.length > 4000000) throw new Error('The family data is too big to share.');
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const current = sharedVersion_();
+    if (String(req.base || '') !== current) return { conflict: true, data: load_('shared'), version: current };
+    saveUnlocked_('shared', req.data);
+    const version = String(Date.now());
+    props_().setProperty('SHARED_VER', version);
+    return { conflict: false, version: version };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 function newWallKey_() {
@@ -505,13 +576,17 @@ function store_() {
 }
 
 function save_(key, value) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try { saveUnlocked_(key, value); } finally { lock.releaseLock(); }
+}
+
+function saveUnlocked_(key, value) {
   const text = JSON.stringify(value);
   const parts = [];
   for (let i = 0; i < text.length; i += CHUNK) parts.push([key, text.slice(i, i + CHUNK)]);
   if (!parts.length) parts.push([key, '']);
-  const lock = LockService.getScriptLock();
-  lock.waitLock(20000);
-  try {
+  {
     const sh = store_();
     const last = sh.getLastRow();
     const others = last > 1 ? sh.getRange(2, 1, last - 1, 2).getValues().filter(function (r) { return r[0] && r[0] !== key; }) : [];
@@ -519,8 +594,6 @@ function save_(key, value) {
     if (last > 1) sh.getRange(2, 1, last - 1, 2).clearContent();
     sh.getRange(2, 1, rows.length, 2).setNumberFormat('@').setValues(rows);
     CacheService.getScriptCache().remove('store:' + key);
-  } finally {
-    lock.releaseLock();
   }
 }
 

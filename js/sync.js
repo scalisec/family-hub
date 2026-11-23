@@ -1,6 +1,10 @@
 // Keeps the family's data in step: this device's copy (instant), the Drive file (shared), and the
 // background helper (calendar sync and the wall). Every change shows on screen straight away and
 // saves to Drive a moment later; other devices' changes arrive within about 30 seconds.
+//
+// Family access: other family members can't see the owner's Drive file, so they keep in step through a
+// shared copy held by the helper instead. The owner's app merges that copy with the Drive file whenever
+// family members have been added, so both always end up the same.
 import * as store from './store.js';
 import { readData, writeData, dataVersion } from './drive.js';
 import { isConnected, onChange as onGoogle } from './google.js';
@@ -13,7 +17,7 @@ const FEED = 'fh.feed';
 function readJSON(key, fallback) { try { return JSON.parse(localStorage.getItem(key) || 'null') ?? fallback; } catch { return fallback; } }
 function writeJSON(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* storage full or blocked: still works this session */ } }
 
-const meta = readJSON(META, { version: null, dirty: false, published: '', wallKey: '' });
+const meta = { version: null, dirty: false, published: '', wallKey: '', role: '', owner: '', family: 0, sharedVer: '', ...readJSON(META, {}) };
 export const state = {
   data: store.normalize(readJSON(LOCAL, null) || store.starterData()),
   status: 'local', // local | saving | saved | offline | error
@@ -56,11 +60,126 @@ async function serial(job) {
   try { return await running; } finally { running = null; }
 }
 
-// First load after Connect Google: reads the Drive file and merges it with this device's copy.
+/* ---------- who is signed in ---------- */
+
+// 'owner', 'member' (a family member the owner let in) or '' (not known yet).
+export const role = () => meta.role;
+export const isMember = () => meta.role === 'member';
+export const familyCount = () => meta.family || 0;
+export const ownerEmail = () => meta.owner || '';
+
+async function whoAmI() {
+  try {
+    const r = await relay('hello');
+    const h = r.hello;
+    meta.role = h.role || 'owner';
+    meta.owner = h.owner || '';
+    meta.family = Number(h.family) || 0;
+    state.wallKey = h.wallKey || state.wallKey;
+    meta.wallKey = state.wallKey;
+    saveMeta();
+    notify('wall');
+    return meta.role;
+  } catch (err) {
+    // Not allowed in: stop before anything is written to this person's own Drive.
+    if (err.message && /hasn't been given access|not from Family Hub/.test(err.message)) throw err;
+    state.relayError = err.message;
+    notify('feed');
+    return meta.role || 'owner'; // helper unreachable: carry on as before
+  }
+}
+
+/* ---------- the shared copy in the helper ---------- */
+
+// Saves to the helper's shared copy. If someone else saved first, merges their copy in and tries again.
+async function sharedSave(data, base) {
+  let next = data;
+  let ver = base || '';
+  for (let i = 0; i < 4; i += 1) {
+    const r = await relay('dataPut', { data: next, base: ver });
+    if (!r.conflict) return { data: next, version: r.version };
+    next = store.prune(r.data ? store.merge(r.data, next) : next);
+    ver = r.version;
+  }
+  throw new Error('Family Hub is busy saving from another phone. Try again in a moment.');
+}
+
+// Takes in a saved copy, keeping anything changed on this device since.
+function adopt(saved, sent) {
+  state.data = store.merge(saved, state.data);
+  meta.dirty = !store.same(state.data, sent);
+  saveMeta();
+  saveLocal();
+  notify('data');
+}
+
+async function loadMember() {
+  const r = await relay('dataGet');
+  if (!r.data) throw new Error(`Nothing has been shared yet. Ask ${meta.owner || 'the owner'} to open Family Hub on their phone once, then press Connect again.`);
+  const merged = store.prune(state.firstRun ? store.normalize(r.data) : store.merge(r.data, state.data));
+  let version = r.version;
+  let final = merged;
+  if (!store.same(merged, r.data)) ({ data: final, version } = await sharedSave(merged, r.version));
+  state.data = final;
+  meta.version = version;
+}
+
+async function pushMember() {
+  const sent = store.prune(state.data);
+  const r = await sharedSave(sent, meta.version);
+  meta.version = r.version;
+  adopt(r.data, sent);
+}
+
+// Owner only, once family members have been added: merges the shared copy and the Drive file both ways.
+let lastShared = null;
+async function shareSync() {
+  if (meta.role !== 'owner' || !meta.family) return;
+  try {
+    const v = (await relay('dataVer')).version || '';
+    if (v && v === meta.sharedVer && lastShared && store.same(lastShared, state.data)) return;
+    const remote = v ? await relay('dataGet') : { data: null, version: '' };
+    if (remote.data) {
+      const merged = store.prune(store.merge(remote.data, state.data));
+      if (!store.same(merged, state.data)) {
+        state.data = merged;
+        meta.dirty = true;
+        saveLocal();
+        notify('data');
+        schedulePush(200);
+      }
+    }
+    if (remote.data && store.same(remote.data, state.data)) { meta.sharedVer = remote.version; lastShared = state.data; saveMeta(); return; }
+    const sent = state.data;
+    const r = await sharedSave(sent, remote.version);
+    meta.sharedVer = r.version;
+    lastShared = r.data;
+    if (!store.same(r.data, sent)) { adopt(r.data, sent); meta.dirty = true; saveMeta(); schedulePush(200); }
+    saveMeta();
+  } catch (err) {
+    state.relayError = err.message;
+    notify('feed');
+  }
+}
+
+// First load after Connect Google: reads the family's data and merges it with this device's copy.
 export async function load({ importOld } = {}) {
   return serial(async () => {
     setStatus('saving');
     try {
+      const who = await whoAmI();
+      if (who === 'member') {
+        await loadMember();
+        state.firstRun = false;
+        state.loaded = true;
+        meta.dirty = false;
+        saveMeta();
+        saveLocal();
+        notify('data');
+        setStatus('saved');
+        await publish();
+        return;
+      }
       const { data, version } = await readData();
       let merged;
       if (!data) {
@@ -85,7 +204,7 @@ export async function load({ importOld } = {}) {
       saveLocal();
       notify('data');
       setStatus('saved');
-      await hello();
+      await shareSync();
       await publish();
     } catch (err) {
       fail(err);
@@ -101,6 +220,13 @@ export async function push() {
     if (!meta.dirty) return;
     setStatus('saving');
     try {
+      if (meta.role === 'member') {
+        await pushMember();
+        setStatus('saved');
+        if (meta.dirty) schedulePush(300);
+        publish().catch(() => {});
+        return;
+      }
       const current = await dataVersion();
       let base = state.data;
       if (current && current !== meta.version) {
@@ -117,6 +243,7 @@ export async function push() {
       saveLocal();
       notify('data');
       setStatus('saved');
+      await shareSync();
       if (meta.dirty) schedulePush(300);
       publish().catch(() => {});
     } catch (err) {
@@ -129,6 +256,22 @@ export async function push() {
 export async function poll() {
   if (!isConnected() || running || meta.dirty) return;
   try {
+    if (meta.role === 'member') {
+      const v = (await relay('dataVer')).version;
+      if (!v || v === meta.version) return;
+      await serial(async () => {
+        const r = await relay('dataGet');
+        if (!r.data) return;
+        state.data = store.merge(r.data, state.data);
+        meta.version = r.version;
+        saveMeta();
+        saveLocal();
+        notify('data');
+        publish().catch(() => {});
+      });
+      return;
+    }
+    if (meta.role === 'owner' && meta.family) await serial(shareSync);
     const v = await dataVersion();
     if (!v || v === meta.version) return;
     await serial(async () => {
@@ -153,19 +296,6 @@ function fail(err) {
 }
 
 /* ---------- background helper ---------- */
-
-async function hello() {
-  try {
-    const r = await relay('hello');
-    state.wallKey = r.hello.wallKey;
-    meta.wallKey = state.wallKey;
-    saveMeta();
-    notify('wall');
-  } catch (err) {
-    state.relayError = err.message;
-    notify('feed');
-  }
-}
 
 function keepFeed(r) {
   state.feed = { ...r.feed, daily: r.daily };
@@ -202,6 +332,15 @@ export async function rotateWallKey() {
   meta.wallKey = r.wallKey;
   saveMeta();
   notify('wall');
+}
+
+// Owner only: who else can sign in (emails). With a list, replaces it.
+export async function family(emails) {
+  const r = await relay('family', emails ? { emails } : {});
+  meta.family = r.family.length;
+  saveMeta();
+  if (meta.family) serial(shareSync).catch(() => {});
+  return r.family;
 }
 
 export const listCalendars = async () => (await relay('calendars')).calendars;

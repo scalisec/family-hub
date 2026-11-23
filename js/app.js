@@ -31,7 +31,12 @@ const change = sync.change;
 
 const peopleList = () => store.people(D());
 function person(id) { return id && id !== 'family' ? store.get(D(), 'people', id) : null; }
-function meId() { return store.setting(D(), 'me', '') || (peopleList().find((p) => p.role === 'adult') || {}).id || ''; }
+// "This is me" is kept per Google account, so each adult's phone knows who "me" is.
+const meKey = () => (accountEmail() ? `me:${accountEmail().toLowerCase()}` : 'me');
+function meId() {
+  return store.setting(D(), meKey(), '') || (sync.isMember() ? '' : store.setting(D(), 'me', ''))
+    || (peopleList().find((p) => p.role === 'adult') || {}).id || '';
+}
 
 function tag(personId) {
   const p = person(personId);
@@ -84,13 +89,13 @@ function statusChip() {
 function statusSheet() {
   const f = state.feed;
   sheet('Sync', h('div', { class: 'stack' },
-    h('p', null, state.status === 'error' ? `Last save had a problem: ${state.error}` : 'Everything you change saves to your Google Drive in a second or two. Other phones see it within about 30 seconds.'),
+    h('p', null, state.status === 'error' ? `Last save had a problem: ${state.error}` : sync.isMember() ? 'Everything you change saves in a second or two. Other phones see it within about 30 seconds.' : 'Everything you change saves to your Google Drive in a second or two. Other phones see it within about 30 seconds.'),
     h('p', { class: 'muted' }, `Calendars last read ${f && f.updated ? dates.time(f.updated) : 'not yet'}. They refresh every 15 minutes.`),
     f && f.errors && f.errors.length ? h('p', { class: 'warn-text' }, `Calendar problems: ${f.errors.join('; ')}`) : null,
     state.relayError ? h('p', { class: 'warn-text' }, `Helper: ${state.relayError}`) : null,
   ), { actions: [
     h('button', { class: 'btn', onclick: async (e) => { e.target.disabled = true; try { await sync.refreshFeed({ sync: true }); toast('Calendars refreshed'); } catch (err) { toast(err.message); } closeSheet(); } }, 'Refresh calendars now'),
-    h('a', { class: 'btn ghost', href: folderLink(), target: '_blank', rel: 'noopener' }, 'Open in Drive'),
+    sync.isMember() ? null : h('a', { class: 'btn ghost', href: folderLink(), target: '_blank', rel: 'noopener' }, 'Open in Drive'),
   ] });
 }
 
@@ -183,7 +188,7 @@ function hasDeco() { const t = store.currentTheme(D(), new Date(), events()); re
 function connectBanner() {
   return h('div', { class: 'banner' },
     h('div', null, h('strong', null, wasConnected() ? 'Reconnect to Google' : 'Connect your Google account'),
-      h('div', { class: 'muted small' }, wasConnected() ? 'Google sign-ins last about an hour. Your changes are kept on this phone until then.' : 'Family Hub keeps everything in a folder in your Google Drive.')),
+      h('div', { class: 'muted small' }, wasConnected() ? 'Google sign-ins last about an hour. Your changes are kept on this phone until then.' : 'Sign in with Google to see and change the family\'s calendar, meals and lists.')),
     h('button', { class: 'btn small', onclick: doConnect }, icon('google'), 'Connect'));
 }
 
@@ -956,6 +961,7 @@ const MORE = [
   ['calview', 'Calendar view', 'week'],
   ['rules', 'Arrival times', 'clock'],
   ['home', 'Home and weather', 'home'],
+  ['family', 'Family access', 'key'],
   ['account', 'Google account', 'google'],
   ['about', 'About and updates', 'info'],
 ];
@@ -970,7 +976,7 @@ function moreScreen() {
       h('h2', { class: 'page-title' }, title),
       morePage(ui.more));
   }
-  return h('div', { class: 'screen' }, card(null, h('div', { class: 'list' }, MORE.map(([key, label, ic]) => row({ onclick: () => openMore(key) },
+  return h('div', { class: 'screen' }, card(null, h('div', { class: 'list' }, MORE.filter(([key]) => !(key === 'family' && sync.isMember())).map(([key, label, ic]) => row({ onclick: () => openMore(key) },
     h('span', { class: 'menu-ic' }, icon(ic)), h('div', { class: 'row-value' }, label), icon('chevron', 'tail'))))),
   h('p', { class: 'muted small center' }, `Family Hub ${VERSION}`));
 }
@@ -1013,7 +1019,7 @@ async function shareApp() {
 
 function shareCard() {
   return card('Share Family Hub', h('div', { class: 'stack' },
-    h('p', { class: 'muted small' }, 'Send the app\'s link by text, email or any app on your phone. It opens Family Hub, which they can install too. For now only your Google account can see the family\'s data.'),
+    h('p', { class: 'muted small' }, 'Send the app\'s link by text, email or any app on your phone. It opens Family Hub, which they can install too. To see the family\'s data they sign in with a Google account added in More > Family access.'),
     h('div', { class: 'btn-row' },
       h('button', { class: 'btn', onclick: shareApp }, icon('share'), 'Share'),
       h('button', { class: 'btn ghost', onclick: async () => {
@@ -1021,8 +1027,62 @@ function shareCard() {
       } }, icon('copy'), 'Copy link'))));
 }
 
+/* ---------- Family access (owner only) ---------- */
+
+const familyState = { list: null, loading: false, error: '' };
+
+function ownerName() {
+  const id = (sync.ownerEmail() && store.setting(D(), `me:${sync.ownerEmail().toLowerCase()}`, '')) || store.setting(D(), 'me', '');
+  const owner = peopleList().find((p) => p.id === id);
+  return owner ? owner.name : 'the owner';
+}
+
+function loadFamily() {
+  if (familyState.loading || !isConnected()) return;
+  familyState.loading = true;
+  sync.family().then((list) => { familyState.list = list; familyState.error = ''; })
+    .catch((err) => { familyState.error = err.message; })
+    .finally(() => { familyState.loading = false; refresh(); });
+}
+
+function familyPage() {
+  if (sync.isMember()) return h('p', { class: 'muted' }, `Only ${ownerName()} can change who has access.`);
+  if (!isConnected()) return card(null, h('p', { class: 'muted' }, 'Connect Google to manage family access.'));
+  if (familyState.list === null && !familyState.error) loadFamily();
+  const list = familyState.list || [];
+  const save = async (next, done) => {
+    try { familyState.list = await sync.family(next); toast(done); } catch (err) { toast(err.message, { ms: 6000 }); }
+    refresh();
+  };
+  const email = h('input', { type: 'email', placeholder: 'Their Gmail address', autocomplete: 'off', autocapitalize: 'off', spellcheck: 'false' });
+  const add = () => {
+    const v = email.value.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) { toast('Type their full Google address'); email.focus(); return; }
+    if (list.includes(v)) { toast('Already added'); return; }
+    save([...list, v], 'Added. They can sign in now.');
+  };
+  email.addEventListener('keydown', (e) => { if (e.key === 'Enter') add(); });
+  return h('div', { class: 'stack' },
+    card('Who else can sign in', h('div', { class: 'stack' },
+      h('p', { class: 'muted small' }, 'Add another adult\'s Google account. They open Family Hub on their own phone, press Connect and sign in with that account. They can see and change the calendar, meals, lists and to-dos. Only you can change the calendars, the wall link, removing photos and this list.'),
+      familyState.error ? h('p', { class: 'warn-text' }, familyState.error) : null,
+      familyState.list === null && !familyState.error ? h('p', { class: 'muted' }, 'Loading...') : null,
+      list.length ? h('div', { class: 'list' }, list.map((e) => h('div', { class: 'row static' },
+        h('span', { class: 'menu-ic' }, icon('people')), h('div', { class: 'row-value' }, e),
+        h('button', { class: 'btn small ghost danger', onclick: () => confirmSheet(`Remove ${e}?`, 'They can\'t see or change Family Hub any more, straight away.', 'Remove', () => save(list.filter((x) => x !== e), 'Removed')) }, 'Remove')))) : null,
+      h('div', { class: 'addrow' }, email, h('button', { class: 'btn small', onclick: add }, icon('plus'), 'Add')))),
+    card('If they see "Access blocked"', h('div', { class: 'stack' },
+      h('p', { class: 'muted small' }, 'While Family Hub is in testing with Google, Google only lets in accounts listed as test users. Add theirs once, on your PC:'),
+      h('ol', { class: 'small steps' },
+        h('li', null, 'Go to console.cloud.google.com and sign in as you.'),
+        h('li', null, 'At the top, pick the project that holds Family Hub\'s sign-in (the one shared with Family Watch Party).'),
+        h('li', null, 'Open Google Auth Platform, then Audience.'),
+        h('li', null, 'Under Test users, press Add users, type their Gmail address and Save.')))));
+}
+
 function morePage(page) {
   switch (page) {
+    case 'family': return familyPage();
     case 'themes': return themesPage();
     case 'wall': return wallPage();
     case 'photos': return photosPage();
@@ -1130,7 +1190,7 @@ function wallPage() {
       link ? h('div', { class: 'btn-row' },
         h('a', { class: 'btn', href: link, target: '_blank', rel: 'noopener' }, icon('tv'), 'Open'),
         h('button', { class: 'btn ghost', onclick: async () => { try { await navigator.clipboard.writeText(link); toast('Link copied'); } catch { toast('Couldn\'t copy. Press and hold the link instead.'); } } }, icon('copy'), 'Copy'),
-        h('button', { class: 'btn ghost', onclick: () => confirmSheet('Make a new wall link?', 'The old link stops working straight away. You\'ll need to open the new one on the wall screen.', 'New link', async () => { try { await sync.rotateWallKey(); toast('New wall link ready'); } catch (err) { toast(err.message); } }) }, icon('sync'), 'New link')) : null)),
+        sync.isMember() ? null : h('button', { class: 'btn ghost', onclick: () => confirmSheet('Make a new wall link?', 'The old link stops working straight away. You\'ll need to open the new one on the wall screen.', 'New link', async () => { try { await sync.rotateWallKey(); toast('New wall link ready'); } catch (err) { toast(err.message); } }) }, icon('sync'), 'New link')) : null)),
     card('What the wall shows', h('div', { class: 'list' }, store.TILES.map(([key, label]) => toggleRow(label, lay[key], (on) => change((d) => store.setSetting(d, 'layout', { ...store.layout(d), [key]: on })))))),
     card('Night dimming', h('div', { class: 'btn-row' }, field('Dim from', from), field('Until', to))));
 }
@@ -1217,6 +1277,7 @@ function photosPage() {
     const t = photoState.thumbs[p.id];
     const on = photoState.picked.has(p.id);
     return h('button', { class: `ph${on ? ' on' : ''}`, 'aria-label': p.name || 'Photo', onclick: () => {
+      if (sync.isMember()) return;
       if (!sel) { photoState.selecting = true; photoState.picked = new Set([p.id]); render(); return; }
       if (on) photoState.picked.delete(p.id); else photoState.picked.add(p.id);
       render();
@@ -1259,7 +1320,7 @@ function photosPage() {
       h('div', { class: 'pad' }, field('Change photo every', every)))),
     card(`Your photos${list.length ? ` (${list.length})` : ''}`,
       photoState.loading && !list.length ? h('p', { class: 'muted' }, 'Loading...')
-        : list.length ? h('div', { class: 'stack' }, grid, h('p', { class: 'muted small' }, sel ? 'Tap photos to pick them.' : 'Tap a photo to start picking ones to remove.')) : empty(isConnected() ? 'No photos yet.' : 'Connect Google to see your photos.'),
+        : list.length ? h('div', { class: 'stack' }, grid, h('p', { class: 'muted small' }, sync.isMember() ? `Only ${ownerName()} can remove photos.` : sel ? 'Tap photos to pick them.' : 'Tap a photo to start picking ones to remove.')) : empty(isConnected() ? 'No photos yet.' : 'Connect Google to see your photos.'),
       sel ? h('div', { class: 'btn-row' },
         h('button', { class: 'link', onclick: () => { photoState.selecting = false; photoState.picked = new Set(); render(); } }, 'Cancel'),
         h('button', { class: 'btn small danger-fill', disabled: !photoState.picked.size, onclick: deleteSel }, icon('trash'), `Remove ${photoState.picked.size || ''}`)) : null));
@@ -1314,7 +1375,7 @@ function personEdit(id) {
       const pid = id || store.newId();
       change((d) => {
         let x = store.put(d, 'people', { id: pid, name: n.slice(0, 30), role: role.value, color, short: short.value.trim().slice(0, 3), order: p.order ?? peopleList().length });
-        if (isMe.checked) x = store.setSetting(x, 'me', pid);
+        if (isMe.checked) x = store.setSetting(x, meKey(), pid);
         return x;
       });
       closeSheet();
@@ -1323,6 +1384,11 @@ function personEdit(id) {
 }
 
 function calendarsPage() {
+  if (sync.isMember()) {
+    const feeds = store.live(D(), 'feeds');
+    return h('div', { class: 'stack' }, h('p', { class: 'muted small' }, `The calendars come from ${ownerName()}'s Google account, so only ${ownerName()} can change which ones show.`),
+      card(null, h('div', { class: 'list' }, feeds.length ? feeds.map((f) => h('div', { class: 'row static' }, h('div', { class: 'row-value' }, f.name || 'Calendar', h('div', { class: 'muted small' }, (person(f.person) || { name: 'Family' }).name)))) : h('div', { class: 'muted pad' }, 'No calendars picked yet.'))));
+  }
   const box = h('div', { class: 'stack' }, h('p', { class: 'muted small' }, 'Tick the calendars to show and pick whose each one is. Team calendars you\'ve subscribed to in Google Calendar show here too.'));
   const listEl = h('div', { class: 'list' }, h('div', { class: 'muted pad' }, isConnected() ? 'Loading your calendars...' : 'Connect Google to pick calendars.'));
   box.append(card(null, listEl));
@@ -1416,9 +1482,11 @@ function accountPage() {
   return h('div', { class: 'stack' },
     card(null, h('div', { class: 'stack' },
       h('div', null, h('div', { class: 'strong' }, connected ? 'Connected' : 'Not connected'), h('div', { class: 'muted small' }, accountEmail() || '')),
-      h('p', { class: 'muted small' }, 'Family Hub can only see the files it made in your Drive (a "Family Hub" folder). Google sign-ins last about an hour; changes made in between wait on this phone and save when you reconnect.'),
+      h('p', { class: 'muted small' }, sync.isMember()
+        ? `You're signed in as a family member. The family's data is kept in ${ownerName()}'s Google Drive; nothing is added to yours. Google sign-ins last about an hour; changes made in between wait on this phone and save when you reconnect.`
+        : 'Family Hub can only see the files it made in your Drive (a "Family Hub" folder). Google sign-ins last about an hour; changes made in between wait on this phone and save when you reconnect.'),
       h('div', { class: 'btn-row' },
-        connected ? h('a', { class: 'btn ghost', href: folderLink(), target: '_blank', rel: 'noopener' }, 'Open the Drive folder') : h('button', { class: 'btn', onclick: doConnect }, icon('google'), 'Connect Google'),
+        connected && sync.isMember() ? null : connected ? h('a', { class: 'btn ghost', href: folderLink(), target: '_blank', rel: 'noopener' }, 'Open the Drive folder') : h('button', { class: 'btn', onclick: doConnect }, icon('google'), 'Connect Google'),
         connected ? h('button', { class: 'btn ghost', onclick: () => { disconnect(); toast('Disconnected'); render(); } }, 'Disconnect') : null))));
 }
 

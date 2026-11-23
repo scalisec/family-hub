@@ -1,8 +1,9 @@
 // The app's version and release history (newest first). Keep VERSION, package.json and
 // version.json in step: the tests check they match.
-export const VERSION = '3.3.1';
+export const VERSION = '3.4.0';
 
 export const RELEASES = [
+  { version: '3.4.0', date: '2026-11-23', notes: ['Family access: let another adult sign in with their own Google account on their own phone (More > Family access). They see and change the calendar, meals, lists and to-dos; setup stays with you.', '"This is me" now works for each person\'s own phone.'] },
   { version: '3.3.1', date: '2026-11-23', notes: ['Share button in More > About and updates: send the Family Hub link by text, email or any app, or copy it.'] },
   { version: '3.3.0', date: '2026-11-14', notes: [
     'Your own lists in the Lists tab: Christmas, Black Friday, packing for a trip and more. Pick what each list tracks: who it\'s for, notes and links, prices with a running total.',
