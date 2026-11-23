@@ -966,7 +966,9 @@ const MORE = [
   ['about', 'About and updates', 'info'],
 ];
 
-function openMore(page) { ui.tab = 'more'; ui.more = page; sessionStorage.setItem('fh.tab', 'more'); render({ animate: true }); }
+function openMore(page) {
+  if (page === 'family') Object.assign(familyState, { list: null, error: '' }); // fresh list each visit
+  ui.tab = 'more'; ui.more = page; sessionStorage.setItem('fh.tab', 'more'); render({ animate: true }); }
 
 function moreScreen() {
   if (ui.more) {
@@ -1051,7 +1053,7 @@ function familyPage() {
   if (familyState.list === null && !familyState.error) loadFamily();
   const list = familyState.list || [];
   const save = async (next, done) => {
-    try { familyState.list = await sync.family(next); toast(done); } catch (err) { toast(err.message, { ms: 6000 }); }
+    try { familyState.list = await sync.family(next); familyState.error = ''; toast(done); } catch (err) { toast(err.message, { ms: 6000 }); }
     refresh();
   };
   const email = h('input', { type: 'email', placeholder: 'Their Gmail address', autocomplete: 'off', autocapitalize: 'off', spellcheck: 'false' });
