@@ -9,7 +9,7 @@ import { wearTip, wxLabel } from '../js/weather.js';
 
 const read = (p) => readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
 const jsFiles = readdirSync(new URL('../js/', import.meta.url)).filter((f) => f.endsWith('.js')).map((f) => `js/${f}`);
-const allFiles = [...jsFiles, 'index.html', 'wall.html', 'css/app.css', 'sw.js', 'apps-script/Relay.gs', 'README.md'];
+const allFiles = [...jsFiles, 'index.html', 'css/app.css', 'sw.js', 'apps-script/Relay.gs', 'README.md'];
 
 test('versions agree', () => {
   assert.equal(JSON.parse(read('package.json')).version, VERSION);
@@ -21,16 +21,14 @@ test('versions agree', () => {
 
 test('pages load their scripts and styles', () => {
   assert.match(read('index.html'), /src="js\/app\.js"/);
-  assert.match(read('wall.html'), /src="js\/wall\.js"/);
-  for (const page of ['index.html', 'wall.html']) assert.match(read(page), /href="css\/app\.css"/);
-  assert.match(read('wall.html'), /name="referrer" content="no-referrer"/);
+  assert.match(read('index.html'), /href="css\/app\.css"/);
 });
 
 test('only talks to the services we expect', () => {
   const allowed = ['accounts.google.com', 'www.googleapis.com', 'oauth2.googleapis.com', 'script.google.com', 'api.open-meteo.com',
     'geocoding-api.open-meteo.com', 'fonts.googleapis.com', 'fonts.gstatic.com', 'drive.google.com', 'zenquotes.io', 'icanhazdadjoke.com',
     'connect.instacart.com', 'www.instacart.ca', 'scalisec.github.io', 'www.google.com'];
-  for (const f of [...jsFiles, 'index.html', 'wall.html', 'sw.js', 'apps-script/Relay.gs']) {
+  for (const f of [...jsFiles, 'index.html', 'sw.js', 'apps-script/Relay.gs']) {
     for (const m of read(f).matchAll(/https:\/\/([a-z0-9.-]+)/gi)) {
       assert.ok(allowed.includes(m[1]), `${f} mentions ${m[1]}`);
     }
@@ -101,4 +99,41 @@ test('helper: snapshot is cleaned and capped', () => {
   assert.equal(s.groceries.length, 400);
   assert.equal(s.place, null);
   assert.equal(s.theme, 'Night');
+});
+
+test('wall link is off: no wall page, and the helper serves nothing without a sign-in', () => {
+  assert.throws(() => read('wall.html'));
+  assert.ok(!jsFiles.includes('js/wall.js'));
+  const r = relay();
+  let out = null;
+  r.ContentService = { createTextOutput: (t) => ({ setMimeType: () => (out = JSON.parse(t)) }), MimeType: { JSON: 'json' } };
+  r.doGet({ parameter: { key: 'anything', photo: 'x' } });
+  assert.equal(out.ok, false);
+  assert.equal(Object.keys(out).sort().join(','), 'error,ok');
+  assert.doesNotMatch(read('apps-script/Relay.gs'), /rotateKey|newWallKey_|photoData_/);
+});
+
+test('helper: no background timer, and the old wall photos are cleared', () => {
+  const src = read('apps-script/Relay.gs');
+  assert.doesNotMatch(src, /newTrigger|everyMinutes/);
+  assert.doesNotMatch(src, /'photoAdd'|'photoList'|'photoDelete'/);
+  const r = relay();
+  const deleted = [];
+  const trashed = [];
+  const props = { PHOTO_FOLDER: 'folder1' };
+  r.ScriptApp = { getProjectTriggers: () => ['t1', 't2'], deleteTrigger: (t) => deleted.push(t), getOAuthToken: () => 'x' };
+  r.PropertiesService = { getScriptProperties: () => ({ getProperty: (k) => props[k] || null, deleteProperty: (k) => { delete props[k]; } }) };
+  r.UrlFetchApp = { fetch: (url) => { trashed.push(url.split('/files/')[1]); return { getResponseCode: () => 200 }; } };
+  let saved = null;
+  r.load_ = () => [{ id: 'p1' }, { id: 'p2' }];
+  r.save_ = (k, v) => { saved = [k, v]; };
+  let gone = false;
+  r.SpreadsheetApp = { getActiveSpreadsheet: () => ({ getSheetByName: () => 'thumbs', deleteSheet: () => { gone = true; } }) };
+  r.stopTimers_();
+  assert.deepEqual(deleted, ['t1', 't2']);
+  assert.equal(r.removePhotos_(), 2);
+  assert.deepEqual(trashed, ['p1', 'p2', 'folder1']);
+  assert.equal(JSON.stringify(saved), '["photos",[]]');
+  assert.equal(props.PHOTO_FOLDER, undefined);
+  assert.ok(gone);
 });

@@ -1,8 +1,9 @@
 // The app's version and release history (newest first). Keep VERSION, package.json and
 // version.json in step: the tests check they match.
-export const VERSION = '3.4.1';
+export const VERSION = '3.5.0';
 
 export const RELEASES = [
+  { version: '3.5.0', date: '2026-11-25', notes: ['The wall screen link is turned off. Any copy of the old link stops working, and nothing can be seen without a Google sign-in.', 'Wall-only settings are gone (Wall screen, pin a list to the wall). Wall photos are moved to the trash in your Drive, where they stay for 30 days.', 'No more background calendar check every 15 minutes: calendars refresh only while someone has Family Hub open.'] },
   { version: '3.4.1', date: '2026-11-23', notes: ['Family access: an old error no longer stays on screen after a change works, and the list reloads each time you open the page.'] },
   { version: '3.4.0', date: '2026-11-23', notes: ['Family access: let another adult sign in with their own Google account on their own phone (More > Family access). They see and change the calendar, meals, lists and to-dos; setup stays with you.', '"This is me" now works for each person\'s own phone.'] },
   { version: '3.3.1', date: '2026-11-23', notes: ['Share button in More > About and updates: send the Family Hub link by text, email or any app, or copy it.'] },

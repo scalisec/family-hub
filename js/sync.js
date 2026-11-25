@@ -1,5 +1,5 @@
 // Keeps the family's data in step: this device's copy (instant), the Drive file (shared), and the
-// background helper (calendar sync and the wall). Every change shows on screen straight away and
+// background helper (calendar sync and family access). Every change shows on screen straight away and
 // saves to Drive a moment later; other devices' changes arrive within about 30 seconds.
 //
 // Family access: other family members can't see the owner's Drive file, so they keep in step through a
@@ -17,13 +17,12 @@ const FEED = 'fh.feed';
 function readJSON(key, fallback) { try { return JSON.parse(localStorage.getItem(key) || 'null') ?? fallback; } catch { return fallback; } }
 function writeJSON(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* storage full or blocked: still works this session */ } }
 
-const meta = { version: null, dirty: false, published: '', wallKey: '', role: '', owner: '', family: 0, sharedVer: '', ...readJSON(META, {}) };
+const meta = { version: null, dirty: false, published: '', role: '', owner: '', family: 0, sharedVer: '', ...readJSON(META, {}) };
 export const state = {
   data: store.normalize(readJSON(LOCAL, null) || store.starterData()),
   status: 'local', // local | saving | saved | offline | error
   error: '',
   feed: readJSON(FEED, null), // { events, nextUp, updated, errors, daily }
-  wallKey: meta.wallKey || '',
   firstRun: !readJSON(LOCAL, null),
   loaded: false,
 };
@@ -75,10 +74,7 @@ async function whoAmI() {
     meta.role = h.role || 'owner';
     meta.owner = h.owner || '';
     meta.family = Number(h.family) || 0;
-    state.wallKey = h.wallKey || state.wallKey;
-    meta.wallKey = state.wallKey;
     saveMeta();
-    notify('wall');
     return meta.role;
   } catch (err) {
     // Not allowed in: stop before anything is written to this person's own Drive.
@@ -304,7 +300,7 @@ function keepFeed(r) {
   notify('feed');
 }
 
-// Sends the wall's copy and the calendar setup to the helper, when they've changed.
+// Sends the calendar setup to the helper, when they've changed.
 export async function publish({ force = false } = {}) {
   if (!isConnected()) return;
   const snap = store.snapshot(state.data);
@@ -324,14 +320,6 @@ export async function publish({ force = false } = {}) {
 export async function refreshFeed({ sync = false } = {}) {
   if (!isConnected()) return;
   try { keepFeed(await relay(sync ? 'sync' : 'feed')); } catch (err) { state.relayError = err.message; notify('feed'); throw err; }
-}
-
-export async function rotateWallKey() {
-  const r = await relay('rotateKey');
-  state.wallKey = r.wallKey;
-  meta.wallKey = r.wallKey;
-  saveMeta();
-  notify('wall');
 }
 
 // Owner only: who else can sign in (emails). With a list, replaces it.

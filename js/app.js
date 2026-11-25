@@ -7,8 +7,7 @@ import { parse, splitItems } from './parse.js';
 import { getWeather, cachedWeather, findPlace, wxIcon } from './weather.js';
 import { connect, disconnect, isConnected, wasConnected, accountEmail, setAccountEmail, gjson, onChange as onGoogle } from './google.js';
 import { folderLink } from './drive.js';
-import { wallLink, relay } from './relay.js';
-import { prepare, isImage } from './photos.js';
+import { relay } from './relay.js';
 import { platform, canPrompt, promptInstall, onInstallChange } from './install.js';
 import * as sync from './sync.js';
 import { VERSION, RELEASES, latestVersion, compareVersions, releaseDate } from './version.js';
@@ -737,7 +736,6 @@ function customListView(id) {
   return h('div', null,
     h('div', { class: 'list-head' },
       h('h2', { class: 'list-title' }, h('span', { class: 'dot big', style: { background: l.color || 'var(--accent)' } }), l.name),
-      l.pinned ? h('span', { class: 'pin-badge' }, icon('tv'), 'On the wall') : null,
       h('button', { class: 'icon-btn', 'aria-label': 'List options', onclick: () => listMenu(id) }, icon('more'))),
     addInput(`Add to ${l.name}`, (v) => addToList(id, splitItems(v).length > 1 ? splitItems(v) : [v.trim()])),
     card(null, open.length ? h('div', { class: 'list' }, open.map((it) => listItemRow(l, it))) : empty(items.length ? 'All ticked off.' : 'Nothing on this list yet.')),
@@ -807,11 +805,9 @@ function listMenu(id) {
   const l = store.get(D(), 'lists', id);
   const name = h('input', { type: 'text', value: l.name, maxlength: '40' });
   const feats = featureToggles(l.features || {});
-  const pin = toggleRow('Show on the wall', Boolean(l.pinned), (on) => { change((d) => store.put(d, 'lists', { id, pinned: on })); closeSheet(); toast(on ? `${l.name} is on the wall` : `${l.name} is off the wall`); });
   sheet(l.name, h('div', { class: 'stack' },
     field('Name', name),
     field('Each item can have', feats.el),
-    h('div', { class: 'list' }, pin),
     h('div', { class: 'list' },
       row({ onclick: () => { change((d) => store.saveTemplate(d, id)); toast(`Saved ${l.name} as a template`); } }, h('span', { class: 'menu-ic' }, icon('copy')),
         h('div', { class: 'row-value' }, 'Save as template', h('div', { class: 'muted small' }, 'Keep a copy to start from next time'))),
@@ -954,8 +950,6 @@ function todoEdit(id) {
 
 const MORE = [
   ['themes', 'Themes', 'palette'],
-  ['wall', 'Wall screen', 'tv'],
-  ['photos', 'Photos and slideshow', 'image'],
   ['people', 'People', 'people'],
   ['calendars', 'Calendars', 'calendar'],
   ['calview', 'Calendar view', 'week'],
@@ -1066,7 +1060,7 @@ function familyPage() {
   email.addEventListener('keydown', (e) => { if (e.key === 'Enter') add(); });
   return h('div', { class: 'stack' },
     card('Who else can sign in', h('div', { class: 'stack' },
-      h('p', { class: 'muted small' }, 'Add another adult\'s Google account. They open Family Hub on their own phone, press Connect and sign in with that account. They can see and change the calendar, meals, lists and to-dos. Only you can change the calendars, the wall link, removing photos and this list.'),
+      h('p', { class: 'muted small' }, 'Add another adult\'s Google account. They open Family Hub on their own phone, press Connect and sign in with that account. They can see and change the calendar, meals, lists and to-dos. Only you can change the calendars and this list.'),
       familyState.error ? h('p', { class: 'warn-text' }, familyState.error) : null,
       familyState.list === null && !familyState.error ? h('p', { class: 'muted' }, 'Loading...') : null,
       list.length ? h('div', { class: 'list' }, list.map((e) => h('div', { class: 'row static' },
@@ -1086,8 +1080,6 @@ function morePage(page) {
   switch (page) {
     case 'family': return familyPage();
     case 'themes': return themesPage();
-    case 'wall': return wallPage();
-    case 'photos': return photosPage();
     case 'people': return peoplePage();
     case 'calendars': return calendarsPage();
     case 'calview': return calViewPage();
@@ -1169,163 +1161,11 @@ function teamThemesCard() {
   const today = gameDayTheme(events(), saved.list);
   return card(null, h('div', { class: 'stack' },
     toggleRow('Switch to the team theme on game days', Boolean(saved.on), (on) => save({ on })),
-    h('p', { class: 'muted small' }, 'On a day with a game on that team\'s calendar, the app and the wall wear the team\'s colours. If both teams play, it shows whoever plays next. Practices don\'t count.'),
+    h('p', { class: 'muted small' }, 'On a day with a game on that team\'s calendar, the app wears the team\'s colours. If both teams play, it shows whoever plays next. Practices don\'t count.'),
     saved.on ? h('div', { class: 'stack' }, pickers) : null,
     h('div', { class: 'list' }, logoRows),
     h('p', { class: 'muted small' }, 'Logos are kept in your Family Hub file in Drive, not in the app\'s public code. A PNG with a see-through background looks best.'),
     saved.on ? h('p', { class: 'small strong' }, today ? `Game day today: ${today}` : 'No team games today.') : null));
-}
-
-function wallPage() {
-  const link = wallLink(state.wallKey);
-  const lay = store.layout(D());
-  const dim = store.setting(D(), 'dim', { from: '22:00', to: '06:00' });
-  const from = h('input', { type: 'time', value: dim.from });
-  const to = h('input', { type: 'time', value: dim.to });
-  const saveDim = () => change((d) => store.setSetting(d, 'dim', { from: from.value || '22:00', to: to.value || '06:00' }));
-  from.addEventListener('change', saveDim);
-  to.addEventListener('change', saveDim);
-  return h('div', { class: 'stack' },
-    card('Wall link', h('div', { class: 'stack' },
-      h('p', { class: 'muted small' }, 'Open this link on the wall screen\'s browser and make it full screen. It shows everything but can\'t change anything, and it doesn\'t need a Google sign-in.'),
-      link ? h('div', { class: 'linkbox' }, link) : h('p', { class: 'muted' }, isConnected() ? 'Getting the link...' : 'Connect Google to get the wall link.'),
-      link ? h('div', { class: 'btn-row' },
-        h('a', { class: 'btn', href: link, target: '_blank', rel: 'noopener' }, icon('tv'), 'Open'),
-        h('button', { class: 'btn ghost', onclick: async () => { try { await navigator.clipboard.writeText(link); toast('Link copied'); } catch { toast('Couldn\'t copy. Press and hold the link instead.'); } } }, icon('copy'), 'Copy'),
-        sync.isMember() ? null : h('button', { class: 'btn ghost', onclick: () => confirmSheet('Make a new wall link?', 'The old link stops working straight away. You\'ll need to open the new one on the wall screen.', 'New link', async () => { try { await sync.rotateWallKey(); toast('New wall link ready'); } catch (err) { toast(err.message); } }) }, icon('sync'), 'New link')) : null)),
-    card('What the wall shows', h('div', { class: 'list' }, store.TILES.map(([key, label]) => toggleRow(label, lay[key], (on) => change((d) => store.setSetting(d, 'layout', { ...store.layout(d), [key]: on })))))),
-    card('Night dimming', h('div', { class: 'btn-row' }, field('Dim from', from), field('Until', to))));
-}
-
-/* ---------- Photos ---------- */
-
-const photoState = { list: null, thumbs: {}, loading: false, queue: [], done: 0, failed: [], busy: false, selecting: false, picked: new Set() };
-
-async function loadPhotos(force = false) {
-  if (!isConnected() || photoState.loading || (photoState.list && !force)) return;
-  photoState.loading = true;
-  try {
-    const r = await relay('photoList');
-    photoState.list = r.photos.sort((a, b) => b.added - a.added);
-    photoState.thumbs = r.thumbs || {};
-  } catch (err) { photoState.error = err.message; }
-  photoState.loading = false;
-  if (ui.tab === 'more' && ui.more === 'photos') refresh();
-}
-
-function addPhotos(files) {
-  const have = new Set((photoState.list || []).map((p) => p.key));
-  const fresh = [...files].filter(isImage).filter((f) => !have.has(`${f.name}|${f.size}|${f.lastModified}`));
-  const skipped = files.length - fresh.length;
-  if (!fresh.length) { toast(skipped ? 'Those photos are already on the wall, or aren\'t photos.' : 'No photos picked.'); return; }
-  photoState.queue.push(...fresh);
-  if (skipped) toast(`${skipped} skipped (already added or not a photo)`);
-  runQueue();
-}
-
-async function runQueue() {
-  if (photoState.busy) return;
-  photoState.busy = true;
-  photoState.done = 0;
-  photoState.failed = [];
-  refreshPhotosPage();
-  while (photoState.queue.length) {
-    const file = photoState.queue.shift();
-    try {
-      const prepared = await prepare(file);
-      const r = await relay('photoAdd', prepared);
-      photoState.list = [r.photo, ...(photoState.list || []).filter((p) => p.id !== r.photo.id)];
-      photoState.thumbs[r.photo.id] = prepared.thumb;
-      photoState.done += 1;
-    } catch (err) {
-      photoState.failed.push(`${file.name}: ${err.message}`);
-      if (err.code === 'not-connected') { photoState.queue = []; break; }
-    }
-    refreshPhotosPage();
-  }
-  photoState.busy = false;
-  toast(`${photoState.done} photo${photoState.done === 1 ? '' : 's'} added${photoState.failed.length ? `, ${photoState.failed.length} didn't work` : ''}`);
-  refreshPhotosPage();
-}
-
-function refreshPhotosPage() {
-  if (ui.tab === 'more' && ui.more === 'photos' && !document.querySelector('.sheet-wrap')) {
-    ui.scroll.more = $('#main')?.scrollTop || 0;
-    render();
-  }
-}
-
-function photosPage() {
-  if (!photoState.list) loadPhotos();
-  const ps = store.photoSettings(D());
-  const setP = (patch) => change((d) => store.setSetting(d, 'photos', { ...store.photoSettings(d), ...patch }));
-  const pickFiles = h('input', { type: 'file', accept: 'image/*', multiple: true, hidden: true });
-  pickFiles.addEventListener('change', () => { addPhotos(pickFiles.files); pickFiles.value = ''; });
-  const pickFolder = h('input', { type: 'file', webkitdirectory: true, multiple: true, hidden: true });
-  pickFolder.addEventListener('change', () => { addPhotos(pickFolder.files); pickFolder.value = ''; });
-  const canFolder = 'webkitdirectory' in pickFolder && !/Android|iPhone|iPad/i.test(navigator.userAgent);
-  const from = h('input', { type: 'time', value: ps.from });
-  const to = h('input', { type: 'time', value: ps.to });
-  from.addEventListener('change', () => setP({ from: from.value || '19:00' }));
-  to.addEventListener('change', () => setP({ to: to.value || '20:30' }));
-  const days = h('select', null, [['all', 'Every day'], ['weekdays', 'Weekdays'], ['weekends', 'Weekends']].map(([v, l]) => h('option', { value: v, selected: ps.days === v }, l)));
-  days.addEventListener('change', () => setP({ days: days.value }));
-  const every = h('select', null, [[10, '10 seconds'], [20, '20 seconds'], [30, '30 seconds'], [60, '1 minute'], [120, '2 minutes']].map(([v, l]) => h('option', { value: String(v), selected: ps.every === v }, l)));
-  every.addEventListener('change', () => setP({ every: Number(every.value) }));
-
-  const list = photoState.list || [];
-  const sel = photoState.selecting;
-  const grid = h('div', { class: 'photo-grid' }, list.map((p) => {
-    const t = photoState.thumbs[p.id];
-    const on = photoState.picked.has(p.id);
-    return h('button', { class: `ph${on ? ' on' : ''}`, 'aria-label': p.name || 'Photo', onclick: () => {
-      if (sync.isMember()) return;
-      if (!sel) { photoState.selecting = true; photoState.picked = new Set([p.id]); render(); return; }
-      if (on) photoState.picked.delete(p.id); else photoState.picked.add(p.id);
-      render();
-    } }, t ? h('img', { src: `data:image/jpeg;base64,${t}`, alt: '', loading: 'lazy' }) : h('span', { class: 'ph-blank' }), sel ? h('span', { class: 'ph-check' }, icon('check')) : null);
-  }));
-  const deleteSel = () => {
-    const ids = [...photoState.picked];
-    confirmSheet(`Remove ${ids.length} photo${ids.length === 1 ? '' : 's'}?`, 'They come off the wall. The copies are moved to the trash in your Drive (Family Hub Photos), where they stay for 30 days.', 'Remove', async () => {
-      try {
-        await relay('photoDelete', { ids });
-        photoState.list = list.filter((p) => !photoState.picked.has(p.id));
-        photoState.selecting = false;
-        photoState.picked = new Set();
-        toast('Removed');
-        render();
-      } catch (err) { toast(err.message); }
-    });
-  };
-
-  return h('div', { class: 'stack' },
-    card('Add photos', h('div', { class: 'stack' },
-      h('p', { class: 'muted small' }, canFolder
-        ? 'Pick photos, or a whole folder. They\'re shrunk to screen size and kept privately in your Drive (Family Hub Photos).'
-        : 'Pick as many as you like: tap and hold one, then tap the rest, or choose a whole album. They\'re shrunk to screen size and kept privately in your Drive.'),
-      !isConnected() ? h('p', { class: 'warn-text' }, 'Connect Google to add photos.') : null,
-      h('div', { class: 'btn-row' },
-        h('button', { class: 'btn', disabled: !isConnected(), onclick: () => pickFiles.click() }, icon('image'), 'Add photos'),
-        canFolder ? h('button', { class: 'btn ghost', disabled: !isConnected(), onclick: () => pickFolder.click() }, icon('folder'), 'Import a folder') : null,
-        pickFiles, pickFolder),
-      photoState.busy ? h('div', { class: 'progress' },
-        h('div', { class: 'small strong' }, `Adding photos: ${photoState.done} done, ${photoState.queue.length + 1} to go`),
-        h('div', { class: 'bar-track' }, h('div', { class: 'bar-fill', style: { width: `${Math.round((photoState.done / (photoState.done + photoState.queue.length + 1)) * 100)}%` } })),
-        h('div', { class: 'muted small' }, 'Keep this screen open until it finishes.')) : null,
-      photoState.failed.length && !photoState.busy ? h('details', { class: 'small' }, h('summary', null, `${photoState.failed.length} didn't work`), h('ul', null, photoState.failed.map((f) => h('li', null, f)))) : null)),
-    card('On the wall', h('div', { class: 'list' },
-      toggleRow('Photo tile', ps.tile, (on) => setP({ tile: on })),
-      toggleRow('Full-screen slideshow at set times', ps.slideshow === 'schedule', (on) => setP({ slideshow: on ? 'schedule' : 'off' })),
-      ps.slideshow === 'schedule' ? h('div', { class: 'btn-row pad' }, field('From', from), field('Until', to), field('Days', days)) : null,
-      toggleRow('Slideshow instead of dimming at night', ps.night, (on) => setP({ night: on })),
-      h('div', { class: 'pad' }, field('Change photo every', every)))),
-    card(`Your photos${list.length ? ` (${list.length})` : ''}`,
-      photoState.loading && !list.length ? h('p', { class: 'muted' }, 'Loading...')
-        : list.length ? h('div', { class: 'stack' }, grid, h('p', { class: 'muted small' }, sync.isMember() ? `Only ${ownerName()} can remove photos.` : sel ? 'Tap photos to pick them.' : 'Tap a photo to start picking ones to remove.')) : empty(isConnected() ? 'No photos yet.' : 'Connect Google to see your photos.'),
-      sel ? h('div', { class: 'btn-row' },
-        h('button', { class: 'link', onclick: () => { photoState.selecting = false; photoState.picked = new Set(); render(); } }, 'Cancel'),
-        h('button', { class: 'btn small danger-fill', disabled: !photoState.picked.size, onclick: deleteSel }, icon('trash'), `Remove ${photoState.picked.size || ''}`)) : null));
 }
 
 function toggleRow(label, on, onSet) {
@@ -1425,7 +1265,6 @@ function calViewPage() {
     h('span', { class: `radio${value === v ? ' on' : ''}` }), h('div', { class: 'row-value' }, text, note ? h('div', { class: 'muted small' }, note) : null)))));
   return h('div', { class: 'stack' },
     choice('Week style', [['grid', 'Time grid', 'Hours down the side, events sized by how long they run'], ['columns', '7 columns', 'One column per day, events listed in order']], o.weekStyle, 'weekStyle'),
-    choice('The wall shows', [['week', 'This week'], ['month', 'This month'], ['list', 'Next 7 days as a list', 'The original compact list']], o.wallView, 'wallView'),
     choice('Weeks start on', [[0, 'Sunday'], [1, 'Monday']], o.weekStart, 'weekStart'));
 }
 

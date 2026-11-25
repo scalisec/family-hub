@@ -3,15 +3,15 @@
  *
  * The app itself runs on GitHub Pages and keeps the family's data in a file in the owner's Google Drive.
  * This small script runs as the owner and does the three things a web page can't do alone:
- *  1. Reads the family's Google calendars every 15 minutes (kids' phones and the wall never need access).
+ *  1. Reads the family's Google calendars when someone has the app open (no timer runs in the background).
  *  2. Works out leave-by times with Google Maps drive times.
- *  3. Serves the wall screen a read-only feed through a secret link (?key=...).
+ *  3. Fetches the joke and quote of the day.
  *
  * Only the family can change anything: every change request must carry a Google sign-in that is checked
  * with Google before anything happens. The owner can let other family members in (More > Family access);
  * they share the family's data through a copy kept here, because their own Google accounts can't see the
- * owner's Drive file. Setup jobs (calendars, wall link, removing photos, family access) stay owner-only. The wall link is read-only and can be replaced
- * at any time from the app (More > Wall > New link).
+ * owner's Drive file. Setup jobs (calendars, family access) stay owner-only.
+ * Every request needs a Google sign-in: there is no link that works without one.
  *
  * No personal details live in this code. Calendars, people, rules and the home address come from the
  * app's Drive file each time it publishes.
@@ -30,22 +30,13 @@ const EVENT_COLORS = {
 
 /* ---------- Entry points ---------- */
 
-/** Wall feed: read-only, needs the secret key. */
-function doGet(e) {
-  const key = String((e && e.parameter && e.parameter.key) || '');
-  const photo = String((e && e.parameter && e.parameter.photo) || '');
-  const wallKey = props_().getProperty('WALL_KEY');
-  if (!wallKey || !key || key !== wallKey) return json_({ ok: false, error: 'This wall link has been replaced. Open More > Wall in the app for the new one.' });
-  try {
-    if (photo) return json_({ ok: true, photo: photoData_(photo) });
-    return json_({ ok: true, wall: true, snapshot: load_('snapshot') || {}, feed: feedOrSync_(), daily: daily_(), photos: photoIds_() });
-  } catch (err) {
-    return json_({ ok: false, error: String(err.message || err) });
-  }
+/** The wall screen's read-only link was turned off in 3.5.0. Nothing is served without a Google sign-in. */
+function doGet() {
+  return json_({ ok: false, error: 'The Family Hub wall screen is turned off.' });
 }
 
 // What a family member (not the owner) may do.
-const MEMBER_ACTIONS = ['hello', 'publish', 'feed', 'sync', 'instacart', 'photoAdd', 'photoList', 'dataVer', 'dataGet', 'dataPut'];
+const MEMBER_ACTIONS = ['hello', 'publish', 'feed', 'sync', 'instacart', 'dataVer', 'dataGet', 'dataPut'];
 
 /** Actions from the app. Body is text/plain JSON: { token, action, data }. */
 function doPost(e) {
@@ -66,12 +57,8 @@ function doPost(e) {
       case 'publish': return json_({ ok: true, feed: publish_(data.snapshot || {}), daily: daily_() });
       case 'feed': return json_({ ok: true, feed: feedOrSync_(), daily: daily_() });
       case 'sync': return json_({ ok: true, feed: syncCalendars(), daily: daily_() });
-      case 'rotateKey': return json_({ ok: true, wallKey: newWallKey_() });
       case 'import': return json_({ ok: true, old: importV2_() });
       case 'instacart': return json_({ ok: true, url: instacart_(data.items || [], data.title || '') });
-      case 'photoAdd': return json_({ ok: true, photo: photoAdd_(data) });
-      case 'photoList': return json_({ ok: true, photos: load_('photos') || [], thumbs: thumbs_() });
-      case 'photoDelete': return json_({ ok: true, deleted: photoDelete_(data.ids || []) });
       default: return json_({ ok: false, error: 'Unknown action.' });
     }
   } catch (err) {
@@ -131,12 +118,11 @@ function codeErr_(msg, code) { const e = new Error(msg); e.code = code; return e
 /* ---------- Actions ---------- */
 
 function hello_(who) {
-  if (who.role === 'owner') ensureTrigger_();
-  let key = props_().getProperty('WALL_KEY');
-  if (!key && who.role === 'owner') key = newWallKey_();
+  if (who.role === 'owner') { stopTimers_(); removePhotos_(); }
+  if (who.role === 'owner' && props_().getProperty('WALL_KEY')) props_().deleteProperty('WALL_KEY'); // old wall link, turned off in 3.5.0
   const feed = load_('feed');
   return { owner: owner_(), role: who.role, email: who.email, family: members_().length, shared: sharedVersion_(),
-           wallKey: key || '', updated: feed ? feed.updated : 0 };
+           updated: feed ? feed.updated : 0 };
 }
 
 /** Owner only. data: { emails: [...] } replaces the list; with no emails, just returns it. */
@@ -179,19 +165,13 @@ function sharedPut_(req) {
   }
 }
 
-function newWallKey_() {
-  const key = Utilities.getUuid().replace(/-/g, '') + Utilities.getUuid().replace(/-/g, '').slice(0, 8);
-  props_().setProperty('WALL_KEY', key);
-  return key;
-}
-
 function calendars_() {
   return CalendarApp.getAllCalendars().map(function (c) {
     return { id: c.getId(), name: c.getName(), color: String(c.getColor() || '') };
   }).sort(function (a, b) { return a.name.localeCompare(b.name); });
 }
 
-/** Stores what the wall shows and what the sync needs. Re-syncs when calendars, people, rules or home change. */
+/** Stores what the calendar sync needs. Re-syncs when calendars, people, rules or home change. */
 function publish_(snapshot) {
   const clean = cleanSnapshot_(snapshot);
   const before = load_('snapshot') || {};
@@ -237,7 +217,7 @@ function feedOrSync_() {
   return syncCalendars();
 }
 
-/* ---------- Calendar sync (runs every 15 minutes as the owner) ---------- */
+/* ---------- Calendar sync (runs as the owner, only when the app asks and the copy is over 20 minutes old) ---------- */
 
 function syncCalendars() {
   const snap = load_('snapshot') || {};
@@ -417,10 +397,9 @@ function instacart_(items, title) {
   return String(JSON.parse(res.getContentText()).products_link_url || '');
 }
 
-/* ---------- Wall photos (kept in the helper's own "Family Hub Photos" folder) ---------- */
+/* ---------- Drive (only for clearing out the old wall photos) ---------- */
 
 const DRIVE = 'https://www.googleapis.com/drive/v3';
-const MAX_PHOTOS = 400;
 
 function driveFetch_(url, opts) {
   const o = opts || {};
@@ -428,108 +407,28 @@ function driveFetch_(url, opts) {
   o.headers = Object.assign({ Authorization: 'Bearer ' + ScriptApp.getOAuthToken() }, o.headers || {});
   const res = UrlFetchApp.fetch(url, o);
   const code = res.getResponseCode();
-  if (code >= 300) throw new Error('Drive said ' + code + (code === 403 ? ': run "authorize" once in Apps Script to allow photos.' : '.'));
+  if (code >= 300) throw new Error('Drive said ' + code + '.');
   return res;
 }
 
-function photoFolder_() {
+/**
+ * Photos were only for the wall, which was turned off in 3.5.0. Moves any stored photos and their folder to the
+ * trash in the owner's Drive (kept there for 30 days) and removes the hidden previews tab. Safe to run again.
+ */
+function removePhotos_() {
   const p = props_();
-  let id = p.getProperty('PHOTO_FOLDER');
-  if (id) {
-    try {
-      const f = JSON.parse(driveFetch_(DRIVE + '/files/' + id + '?fields=id,trashed').getContentText());
-      if (!f.trashed) return id;
-    } catch (err) { /* make a new one */ }
-  }
-  const made = JSON.parse(driveFetch_(DRIVE + '/files?fields=id', {
-    method: 'post', contentType: 'application/json',
-    payload: JSON.stringify({ name: 'Family Hub Photos', mimeType: 'application/vnd.google-apps.folder' })
-  }).getContentText());
-  p.setProperty('PHOTO_FOLDER', made.id);
-  return made.id;
-}
-
-/** data: { name, key, data (base64 JPEG, about 1920 px), thumb (base64 JPEG, about 240 px), w, h } */
-function photoAdd_(data) {
-  const list = load_('photos') || [];
-  const key = String(data.key || '').slice(0, 200);
-  const dupe = key && list.find(function (x) { return x.key === key; });
-  if (dupe) return dupe;
-  if (list.length >= MAX_PHOTOS) throw new Error('The wall holds up to ' + MAX_PHOTOS + ' photos. Remove some first.');
-  const b64 = String(data.data || '');
-  if (!b64 || b64.length > 4000000) throw new Error('That photo is too big.');
-  const bytes = Utilities.base64Decode(b64);
-  const folder = photoFolder_();
-  const up = JSON.parse(driveFetch_('https://www.googleapis.com/upload/drive/v3/files?uploadType=media&fields=id', {
-    method: 'post', contentType: 'image/jpeg', payload: bytes
-  }).getContentText());
-  driveFetch_(DRIVE + '/files/' + up.id + '?addParents=' + folder + '&removeParents=root&fields=id', {
-    method: 'patch', contentType: 'application/json',
-    payload: JSON.stringify({ name: String(data.name || 'photo').slice(0, 120).replace(/\.[a-z0-9]+$/i, '') + '.jpg' })
-  });
-  const rec = { id: up.id, key: key, name: String(data.name || '').slice(0, 120), w: Number(data.w) || 0, h: Number(data.h) || 0, added: Date.now() };
-  // The app sends photos one at a time, so a simple read-then-save is safe here.
-  {
-    const fresh = load_('photos') || [];
-    fresh.push(rec);
-    save_('photos', fresh);
-    if (data.thumb && String(data.thumb).length < 45000) {
-      const sh = thumbSheet_();
-      sh.getRange(sh.getLastRow() + 1, 1, 1, 2).setNumberFormat('@').setValues([[up.id, String(data.thumb)]]);
-    }
-  }
-  return rec;
-}
-
-function photoDelete_(ids) {
-  const gone = {};
-  ids.slice(0, 500).forEach(function (id) {
+  const trash = function (id) {
     try { driveFetch_(DRIVE + '/files/' + encodeURIComponent(id), { method: 'patch', contentType: 'application/json', payload: JSON.stringify({ trashed: true }) }); } catch (err) { /* already gone */ }
-    gone[id] = true;
-  });
-  {
-    save_('photos', (load_('photos') || []).filter(function (p) { return !gone[p.id]; }));
-    const sh = thumbSheet_();
-    const last = sh.getLastRow();
-    if (last > 1) {
-      const keep = sh.getRange(2, 1, last - 1, 2).getValues().filter(function (r) { return r[0] && !gone[r[0]]; });
-      sh.getRange(2, 1, last - 1, 2).clearContent();
-      if (keep.length) sh.getRange(2, 1, keep.length, 2).setValues(keep);
-    }
-  }
-  return Object.keys(gone).length;
-}
-
-/** Small previews for the app's photo grid, one row each in a hidden "Thumbs" tab. */
-function thumbSheet_() {
+  };
+  const list = load_('photos') || [];
+  list.forEach(function (ph) { trash(ph.id); });
+  if (list.length) save_('photos', []);
+  const folder = p.getProperty('PHOTO_FOLDER');
+  if (folder) { trash(folder); p.deleteProperty('PHOTO_FOLDER'); }
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  let sh = ss.getSheetByName('Thumbs');
-  if (!sh) {
-    sh = ss.insertSheet('Thumbs');
-    sh.getRange(1, 1, 1, 2).setValues([['photo', 'preview (written by Family Hub, do not edit)']]).setFontWeight('bold');
-    sh.getRange('A:B').setNumberFormat('@');
-    sh.hideSheet();
-  }
-  return sh;
-}
-
-function thumbs_() {
-  const sh = thumbSheet_();
-  const last = sh.getLastRow();
-  const out = {};
-  if (last > 1) sh.getRange(2, 1, last - 1, 2).getValues().forEach(function (r) { if (r[0]) out[r[0]] = r[1]; });
-  return out;
-}
-
-function photoIds_() {
-  return (load_('photos') || []).map(function (p) { return p.id; });
-}
-
-/** For the wall: one photo as base64, only if it's one of the wall's photos. */
-function photoData_(id) {
-  if (photoIds_().indexOf(id) < 0) throw new Error('No such photo.');
-  const res = driveFetch_(DRIVE + '/files/' + encodeURIComponent(id) + '?alt=media');
-  return Utilities.base64Encode(res.getBlob().getBytes());
+  const thumbs = ss.getSheetByName('Thumbs');
+  if (thumbs) ss.deleteSheet(thumbs);
+  return list.length;
 }
 
 /* ---------- Bring over the old version's setup (one time) ---------- */
@@ -613,27 +512,19 @@ function load_(key) {
 
 /* ---------- Helpers ---------- */
 
-function ensureTrigger_() {
-  const has = ScriptApp.getProjectTriggers().some(function (t) {
-    if (t.getHandlerFunction() !== 'syncCalendars') return false;
-    return true;
-  });
-  ScriptApp.getProjectTriggers().forEach(function (t) {
-    const fn = t.getHandlerFunction();
-    if (fn !== 'syncCalendars') ScriptApp.deleteTrigger(t); // old version's timers
-  });
-  if (!has) ScriptApp.newTrigger('syncCalendars').timeBased().everyMinutes(15).create();
+/** No background timer: the calendars are read only when someone has the app open. Removes any old timers. */
+function stopTimers_() {
+  ScriptApp.getProjectTriggers().forEach(function (t) { ScriptApp.deleteTrigger(t); });
 }
 
 /** Run once from the Apps Script editor after an update that asks for new permissions. */
 function authorize() {
   owner_();
-  ensureTrigger_();
+  stopTimers_();
   CalendarApp.getAllCalendars();
   UrlFetchApp.fetch('https://zenquotes.io/api/today', { muteHttpExceptions: true });
   Maps.newDirectionFinder();
   store_();
-  photoFolder_();
   Logger.log('Family Hub helper is ready for ' + owner_());
 }
 
